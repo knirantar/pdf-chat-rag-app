@@ -1,0 +1,56 @@
+# ======================
+# Environment variables
+# ======================
+.env
+.env.*
+!.env.example
+
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+.venv/
+venv/
+ENV/
+pip-wheel-metadata/
+
+# ======================
+# Node / React
+# ======================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/build/
+
+# ======================
+# Docker
+# ======================
+*.tar
+docker-data/
+.docker/
+
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ======================
+# Redis
+# ======================
+dump.rdb
+
+# ======================
+# Build / Cache
+# ======================
+dist/
+build/
+.cache/

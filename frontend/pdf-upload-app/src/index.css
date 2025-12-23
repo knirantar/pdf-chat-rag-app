@@ -1,0 +1,85 @@
+/* @import url('https://fonts.googleapis.com/css2?family=Geist&family=Geist+Mono&display=swap'); */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* :root {
+  --background: #212121;
+  --foreground: #ffffff;
+  --card: #2a2a2a;
+  --border: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+  --radius: 0.5rem;
+} */
+
+/* Dark mode */
+body.dark {
+  --background: #212121;
+  --foreground: #ffffff;
+  --card: #2a2a2a;
+  --border: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 100, 255, 0.2);
+}
+
+/* Base styles */
+/* html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: 'Geist', 'Geist Mono', sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+} */
+
+/* Scrollbar for specific scrollable div */
+.scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Firefox */
+.scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* Chat card and input */
+.card {
+  background-color: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+textarea {
+  background-color: var(--card);
+  color: var(--foreground);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  width: 100%;
+  resize: none;
+  outline: none;
+}
+
+/* Buttons */
+button {
+  border-radius: var(--radius);
+  transition: background-color 0.2s;
+}

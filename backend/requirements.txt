@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+PyMuPDF
+python-multipart
+aiofiles
+requests
+sentence-transformers
+numpy
+faiss-cpu
+nltk
+redis
+openai
