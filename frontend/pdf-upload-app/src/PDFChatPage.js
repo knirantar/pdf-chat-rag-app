@@ -51,7 +51,7 @@ export default function ChatPdf() {
             const formData = new FormData();
             formData.append("file", file);
 
-            const res = await fetch("/api/upload-pdf", {
+            const res = await fetch(`${REACT_APP_API_URL}/upload-pdf`, {
                 method: "POST",
                 body: formData,
             });
@@ -76,7 +76,7 @@ export default function ChatPdf() {
         setAsking(true);
 
         try {
-            const res = await fetch("/api/ask", {
+            const res = await fetch(`${REACT_APP_API_URL}/ask`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
