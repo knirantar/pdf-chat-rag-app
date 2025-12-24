@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+**/node_modules
+npm-debug.log
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+
+# Builds
+build
+dist
+
+# Environment
+.env
+
+# OS
+.DS_Store
+
+# Large assets
+*.pdf
+*.zip
+*.faiss
