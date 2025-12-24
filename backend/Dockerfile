@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
+COPY requirements.txt .
 
 # faster + smaller installs
 RUN pip install --no-cache-dir -r requirements.txt
@@ -25,7 +25,7 @@ EOF
 
 ENV NLTK_DATA=/usr/local/nltk_data
 
-COPY backend ./backend
+COPY . ./backend
 
 EXPOSE 8000
 
