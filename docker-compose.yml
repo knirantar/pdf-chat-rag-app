@@ -14,6 +14,8 @@ services:
   frontend:
     build:
       context: .
+      args:
+        REACT_APP_API_URL: http://backend:8000
       dockerfile: frontend/pdf-upload-app/Dockerfile
     ports:
       - "80:80"

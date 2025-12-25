@@ -1,7 +1,10 @@
 import redis
 import os
 
-REDIS_URL = os.getenv("REDIS_URL")
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST", "localhost"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    decode_responses=True,
+)
 
 CHAT_TTL_SECONDS = 60 * 60 * 24  # 24 hours
