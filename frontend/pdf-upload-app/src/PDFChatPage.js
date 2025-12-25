@@ -139,11 +139,9 @@ export default function ChatPdf({ onLogout }) {
                     setMessages((prev) => {
                         const updated = [...prev];
                         const prevContent = updated[assistantIndex].content;
-                        const needsSpace =
-                            prevContent.length > 0 && !prevContent.slice(-1).match(/\s/);
                         updated[assistantIndex] = {
                             ...updated[assistantIndex],
-                            content: prevContent + (needsSpace ? " " : "") + token,
+                            content: prevContent + token,
                         };
                         return updated;
                     });
