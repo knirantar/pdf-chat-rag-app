@@ -2,6 +2,7 @@ import hashlib
 import numpy as np
 import os
 from openai import OpenAI
+import re
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 embed_model = os.getenv("EMBED_MODEL", "text-embedding-3-large")    
