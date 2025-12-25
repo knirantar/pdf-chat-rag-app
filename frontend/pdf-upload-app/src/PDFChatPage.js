@@ -122,13 +122,14 @@ export default function ChatPdf({ onLogout }) {
 
             buffer += decoder.decode(value, { stream: true });
 
-            const parts = buffer.split("\n\n");
+            const parts = buffer.split("\n");
             buffer = parts.pop();
+
 
             for (const part of parts) {
                 if (!part.startsWith("data:")) continue;
 
-                const token = part.replace("data:", "");
+                const token = part.replace(/^data:\s?/, "");
 
                 if (token === "[DONE]") {
                     setAsking(false);
