@@ -168,7 +168,8 @@ async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user
     return {
         "pdf_id": pdf_id,
         "message": "PDF indexed successfully",
-        "chunks": len(chunks)
+        "chunks": len(chunks),
+        "msg": f"PDF uploaded by {user['email']}"
     }
 
 @app.post("/ask")
