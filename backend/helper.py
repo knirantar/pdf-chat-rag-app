@@ -36,3 +36,9 @@ def embed_query(text: str) -> np.ndarray:
         input=text.strip()
     )
     return np.array([response.data[0].embedding], dtype="float32")
+
+def normalize_markdown(text):
+    text = re.sub(r"\*\*\s+(.*?)\s+\*\*", r"**\1**", text)
+    text = re.sub(r"\n{1,}####", "\n\n####", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text

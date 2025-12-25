@@ -8,7 +8,7 @@ import faiss
 from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
-from backend.helper import compute_pdf_hash, embed_texts, embed_query
+from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize_markdown
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
@@ -233,10 +233,12 @@ def ask(req: AskRequest):
 
     # Verify answer to reduce hallucination
     verification = verify_answer(result["text"], context)
-
+    
     # Save chat messages
     save_chat_message(req.conversation_id, "user", req.question)
     save_chat_message(req.conversation_id, "assistant", result["text"])
+
+    result['text'] = normalize_markdown(result['text'])
 
     return {
         "messages": [{"role": "assistant", "content": result["text"]}],
