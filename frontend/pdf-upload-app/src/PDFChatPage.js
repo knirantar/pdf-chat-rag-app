@@ -98,57 +98,65 @@ export default function ChatPdf({ onLogout }) {
         setQuestion("");
         setAsking(true);
 
-        const res = await fetch(`${API_URL}/ask-stream`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("app_token")}`,
-            },
-            body: JSON.stringify({
-                question,
-                pdf_id: activePdf.id,
-                conversation_id: conversationId.current,
-                answer_mode: answerMode,
-            }),
-        });
+        try {
+            const res = await fetch(`${API_URL}/ask-stream`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("app_token")}`,
+                },
+                body: JSON.stringify({
+                    question,
+                    pdf_id: activePdf.id,
+                    conversation_id: conversationId.current,
+                    answer_mode: answerMode,
+                }),
+            });
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
 
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
+                buffer += decoder.decode(value, { stream: true });
 
-            const parts = buffer.split("\n");
-            buffer = parts.pop();
+                const parts = buffer.split("\n");
+                buffer = parts.pop(); // keep incomplete part
 
+                for (const part of parts) {
+                    if (!part.startsWith("data:")) continue;
 
-            for (const part of parts) {
-                if (!part.startsWith("data:")) continue;
+                    let token = part.replace(/^data:\s?/, "");
+                    if (token === "[DONE]") {
+                        setAsking(false);
+                        return;
+                    }
 
-                const token = part.replace(/^data:\s?/, "");
-
-                if (token === "[DONE]") {
-                    setAsking(false);
-                    return;
+                    // Fix run-on words: add a space if previous char is not whitespace
+                    setMessages((prev) => {
+                        const updated = [...prev];
+                        const prevContent = updated[assistantIndex].content;
+                        const needsSpace =
+                            prevContent.length > 0 && !prevContent.slice(-1).match(/\s/);
+                        updated[assistantIndex] = {
+                            ...updated[assistantIndex],
+                            content: prevContent + (needsSpace ? " " : "") + token,
+                        };
+                        return updated;
+                    });
                 }
-
-                setMessages((prev) => {
-                    const updated = [...prev];
-                    updated[assistantIndex] = {
-                        ...updated[assistantIndex],
-                        content: updated[assistantIndex].content + token,
-                    };
-                    return updated;
-                });
             }
-        }
 
-        setAsking(false);
+            setAsking(false);
+        } catch (err) {
+            console.error("Error streaming answer:", err);
+            setAsking(false);
+        }
     };
+
 
 
     const resetChat = () => {
