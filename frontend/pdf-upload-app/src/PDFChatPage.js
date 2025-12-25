@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Upload, Send, Plus, FileText, Loader2 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 
 
 
@@ -286,7 +289,46 @@ export default function ChatPdf({ onLogout }) {
                                     className={`max-w-[80%] px-4 py-3 rounded-lg ${m.role === "user" ? "bg-blue-600 text-white" : "bg-zinc-800 text-white"
                                         }`}
                                 >
-                                    <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>
+                                    {m.role === "assistant" ? (
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                code({ inline, children }) {
+                                                    return inline ? (
+                                                        <code className="bg-white/10 px-1 rounded text-xs">
+                                                            {children}
+                                                        </code>
+                                                    ) : (
+                                                        <pre className="bg-black/40 p-3 rounded-lg overflow-x-auto text-xs mt-2">
+                                                            <code>{children}</code>
+                                                        </pre>
+                                                    );
+                                                },
+                                                ul({ children }) {
+                                                    return <ul className="list-disc ml-5 mt-2">{children}</ul>;
+                                                },
+                                                ol({ children }) {
+                                                    return <ol className="list-decimal ml-5 mt-2">{children}</ol>;
+                                                },
+                                                h1({ children }) {
+                                                    return <h1 className="text-lg font-semibold mt-3">{children}</h1>;
+                                                },
+                                                h2({ children }) {
+                                                    return <h2 className="text-base font-semibold mt-3">{children}</h2>;
+                                                },
+                                                p({ children }) {
+                                                    return <p className="mt-2 leading-relaxed">{children}</p>;
+                                                },
+                                            }}
+                                        >
+                                            {m.content}
+                                        </ReactMarkdown>
+                                    ) : (
+                                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                            {m.content}
+                                        </div>
+                                    )}
+
 
                                     {m.role === "assistant" && m.confidence !== undefined && (
                                         <div className="mt-3 text-xs text-white/60">
