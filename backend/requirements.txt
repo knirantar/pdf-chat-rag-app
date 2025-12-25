@@ -11,3 +11,6 @@ faiss-cpu
 nltk
 redis
 openai
+python-jose
+google-auth
+requests

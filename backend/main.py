@@ -9,7 +9,9 @@ from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
 from backend.helper import compute_pdf_hash, embed_texts, embed_query
-import os
+from backend.auth.dependencies import get_current_user
+from fastapi import Depends
+from backend.routes.auth import auth_router
 
 EMBED_DIM = 3072
 MAX_CHARS = 900
@@ -27,6 +29,8 @@ INDEX_ROOT.mkdir(parents=True, exist_ok=True)
 
 # -------------------- APP --------------------
 app = FastAPI(title="PDF RAG Chat Backend")
+
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,7 +115,7 @@ class AskRequest(BaseModel):
 
 # -------------------- ROUTES --------------------
 @app.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user)):
     if file.content_type != "application/pdf":
         raise HTTPException(400, "Only PDF allowed")
 
@@ -164,7 +168,8 @@ async def upload_pdf(file: UploadFile = File(...)):
     return {
         "pdf_id": pdf_id,
         "message": "PDF indexed successfully",
-        "chunks": len(chunks)
+        "chunks": len(chunks),
+        "msg": f"PDF uploaded by {user['email']}"
     }
 
 @app.post("/ask")

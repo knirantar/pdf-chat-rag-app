@@ -1,8 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Upload, Send, Plus, FileText, Loader2 } from "lucide-react";
+import { jwtDecode } from "jwt-decode";
 
-export default function ChatPdf() {
+
+
+export default function ChatPdf({ onLogout }) {
+    const getAuthHeaders = () => ({
+        Authorization: `Bearer ${localStorage.getItem("app_token")}`,
+    });
+    const token = localStorage.getItem("app_token");
+    const user = token ? jwtDecode(token) : null;
+
     const conversationId = useRef(uuidv4());
     const messagesEndRef = useRef(null);
 
@@ -15,29 +24,32 @@ export default function ChatPdf() {
     const [answerMode, setAnswerMode] = useState("strict");
     const [expandedSources, setExpandedSources] = useState({});
     const API_URL = process.env.REACT_APP_API_URL || "http://backend:8000";
+    const chatKey = user ? `chatSession_${user.email}` : null;
 
     // Load saved session on mount
     useEffect(() => {
-        const savedSession = localStorage.getItem("chatSession");
+        if (!chatKey) return;
+        const savedSession = localStorage.getItem(chatKey);
         if (savedSession) {
             const { activePdf: pdf, messages: msgs, conversationId: convId } = JSON.parse(savedSession);
             if (pdf) setActivePdf(pdf);
             if (msgs) setMessages(msgs);
             if (convId) conversationId.current = convId;
         }
-    }, []);
+    }, [chatKey]);
 
     // Save session to localStorage whenever messages or activePdf change
     useEffect(() => {
+        if (!chatKey) return;
         localStorage.setItem(
-            "chatSession",
+            chatKey,
             JSON.stringify({
                 activePdf,
                 messages,
                 conversationId: conversationId.current,
             })
         );
-    }, [activePdf, messages]);
+    }, [activePdf, messages, chatKey]);
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -54,6 +66,9 @@ export default function ChatPdf() {
 
             const res = await fetch(`/api/upload-pdf`, {
                 method: "POST",
+                headers: {
+                    ...getAuthHeaders()
+                },
                 body: formData,
             });
 
@@ -79,7 +94,10 @@ export default function ChatPdf() {
         try {
             const res = await fetch(`/api/ask`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...getAuthHeaders()
+                },
                 body: JSON.stringify({
                     question,
                     pdf_id: activePdf.id,
@@ -117,6 +135,14 @@ export default function ChatPdf() {
             [index]: !prev[index],
         }));
     };
+
+    useEffect(() => {
+        // On fresh login, start clean
+        setMessages([]);
+        setActivePdf(null);
+        conversationId.current = uuidv4();
+    }, []);
+
 
     return (
         <div className="flex h-screen bg-zinc-900 text-white">
@@ -167,6 +193,7 @@ export default function ChatPdf() {
             <main className="flex-1 flex flex-col">
                 {/* Header */}
                 <header className="p-4 border-b border-white/10 flex items-center gap-4">
+                    {/* Upload */}
                     <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-white/10 rounded hover:bg-white/20">
                         <Upload size={16} /> Upload PDF
                         <input
@@ -191,7 +218,33 @@ export default function ChatPdf() {
                             <Loader2 className="animate-spin" size={16} /> Indexing...
                         </span>
                     )}
+
+                    {/* Spacer */}
+                    <div className="ml-auto flex items-center gap-3">
+                        {user && (
+                            <>
+                                <img
+                                    src={user.picture}
+                                    alt="profile"
+                                    className="w-8 h-8 rounded-full border border-white/20"
+                                />
+                                <div className="text-right text-xs leading-tight">
+                                    <div className="font-medium">{user.name}</div>
+                                    <div className="text-white/50">{user.email}</div>
+                                </div>
+                            </>
+                        )}
+
+                        <button
+                            onClick={onLogout}
+                            className="ml-3 px-3 py-1 text-xs bg-red-600 rounded hover:bg-red-700"
+                        >
+                            Logout
+                        </button>
+                    </div>
                 </header>
+
+
 
                 <section className="flex-1 overflow-y-auto scrollbar p-6">
                     <div className="mx-auto max-w-3xl space-y-4">
