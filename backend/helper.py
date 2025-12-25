@@ -38,8 +38,21 @@ def embed_query(text: str) -> np.ndarray:
     )
     return np.array([response.data[0].embedding], dtype="float32")
 
-def normalize_markdown(text):
+def normalize_markdown(text: str) -> str:
+    # Fix bold spacing
     text = re.sub(r"\*\*\s+(.*?)\s+\*\*", r"**\1**", text)
-    text = re.sub(r"\n{1,}####", "\n\n####", text)
+
+    # Fix spaced words: "Strateg ic" → "Strategic"
+    text = re.sub(r"(\w)\s+(\w)", r"\1 \2", text)
+
+    # Headings on new lines
+    text = re.sub(r"(#+)([^\n])", r"\1 \2", text)
+
+    # Ensure blank line before headings
+    text = re.sub(r"\n(#+)", r"\n\n\1", text)
+
+    # Normalize newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
-    return text
+
+    return text.strip()
+

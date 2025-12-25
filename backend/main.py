@@ -285,20 +285,33 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     history = get_chat_history(req.conversation_id)
 
     def event_generator():
-        # Stream tokens
+        buffer = ""
+
         for token in stream_answer(
             context,
             req.question,
             history,
             req.answer_mode
         ):
-            yield f"data:{token}\n\n"
+            buffer += token
+
+            # Stream only when buffer has enough content
+            if len(buffer) > 80 or token.endswith("\n"):
+                clean = normalize_markdown(buffer)
+                yield f"data:{clean}\n\n"
+                buffer = ""
+
+        # Flush remaining buffer
+        if buffer.strip():
+            clean = normalize_markdown(buffer)
+            yield f"data:{clean}\n\n"
 
         # Save chat AFTER completion
         save_chat_message(req.conversation_id, "user", req.question)
         save_chat_message(req.conversation_id, "assistant", "[STREAMED]")
 
         yield "data:[DONE]\n\n"
+
 
     return StreamingResponse(
         event_generator(),
