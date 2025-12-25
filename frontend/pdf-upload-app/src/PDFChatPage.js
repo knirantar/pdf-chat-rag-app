@@ -155,6 +155,12 @@ export default function ChatPdf({ onLogout }) {
         }
     };
 
+    const fixMarkdown = (text) => {
+        return text
+            .replace(/([^\n])(#{1,6}\s)/g, "$1\n\n$2")
+            .replace(/([^\n])(-\s)/g, "$1\n\n$2");
+    };
+
 
 
     const resetChat = () => {
@@ -328,7 +334,7 @@ export default function ChatPdf({ onLogout }) {
                                                 },
                                             }}
                                         >
-                                            {m.content}
+                                            {fixMarkdown(m.content)}
                                         </ReactMarkdown>
                                     ) : (
                                         <div className="whitespace-pre-wrap text-sm leading-relaxed">
