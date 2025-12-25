@@ -41,6 +41,7 @@ Rules:
 - Use ONLY the document context provided below.
 - If the answer is not explicitly and clearly present, say:
   "The document does not contain this information."
+- Structure the answer using headings and bullet points where appropriate.
 - Do NOT use general knowledge.
 - Do NOT infer, guess, or extrapolate.
 - Do NOT mention sources, pages, PDFs, confidence, or metadata.
@@ -52,6 +53,7 @@ Rules:
 - Prefer the document context when it is relevant.
 - If the document does not fully answer the question:
   - You MAY use general knowledge to explain the concept.
+- Structure the answer using headings and bullet points where appropriate.
 - If document context is used, relate your explanation to it.
 - Clearly explain concepts in simple language.
 - Do NOT fabricate document-specific facts.
