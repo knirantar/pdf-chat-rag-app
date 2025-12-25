@@ -1,7 +1,6 @@
 Streaming GPT tokens with citations UI
 2️⃣ Chat memory per conversation - DONE
-3️⃣ Cost optimization + caching
-4️⃣ Local LLM alternative
+3️⃣ Cost optimization + caching - Done
 5️⃣ Enterprise security hardening
 
 

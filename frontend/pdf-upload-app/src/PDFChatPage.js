@@ -14,7 +14,7 @@ export default function ChatPdf() {
     const [asking, setAsking] = useState(false);
     const [answerMode, setAnswerMode] = useState("strict");
     const [expandedSources, setExpandedSources] = useState({});
-    const API_URL = process.env.REACT_APP_API_URL;
+    const API_URL = process.env.REACT_APP_API_URL || "http://backend:8000";
 
     // Load saved session on mount
     useEffect(() => {
@@ -52,7 +52,7 @@ export default function ChatPdf() {
             const formData = new FormData();
             formData.append("file", file);
 
-            const res = await fetch(`${API_URL}/upload-pdf`, {
+            const res = await fetch(`/api/upload-pdf`, {
                 method: "POST",
                 body: formData,
             });
@@ -77,7 +77,7 @@ export default function ChatPdf() {
         setAsking(true);
 
         try {
-            const res = await fetch(`${API_URL}/ask`, {
+            const res = await fetch(`/api/ask`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
