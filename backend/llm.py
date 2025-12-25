@@ -138,3 +138,18 @@ Return ONLY valid JSON:
         return json.loads(response.choices[0].message.content)
     except Exception:
         return {"supported": False, "strength": "none"}
+
+def stream_answer(context: str, question: str, history: list, answer_mode: str):
+    prompt = build_prompt(context, question, history, answer_mode)
+
+    stream = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        stream=True
+    )
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        if delta and delta.content:
+            yield delta.content

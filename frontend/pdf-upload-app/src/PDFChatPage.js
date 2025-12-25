@@ -88,41 +88,64 @@ export default function ChatPdf({ onLogout }) {
 
         const userMsg = { role: "user", content: question };
         setMessages((m) => [...m, userMsg]);
+
+        const assistantIndex = messages.length + 1;
+        setMessages((m) => [...m, { role: "assistant", content: "" }]);
+
         setQuestion("");
         setAsking(true);
 
-        try {
-            const res = await fetch(`${API_URL}/ask`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify({
-                    question,
-                    pdf_id: activePdf.id,
-                    conversation_id: conversationId.current,
-                    answer_mode: answerMode,
-                }),
-            });
+        const res = await fetch(`/api/ask-stream`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("app_token")}`,
+            },
+            body: JSON.stringify({
+                question,
+                pdf_id: activePdf.id,
+                conversation_id: conversationId.current,
+                answer_mode: answerMode,
+            }),
+        });
 
-            const data = await res.json();
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-            setMessages((m) => [
-                ...m,
-                {
-                    role: "assistant",
-                    content: data.messages?.[0]?.content || "No response",
-                    confidence: data.confidence ?? null,
-                    sources: Array.isArray(data.sources) ? data.sources : [],
-                },
-            ]);
-        } catch {
-            alert("Error getting answer");
-        } finally {
-            setAsking(false);
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop();
+
+            for (const part of parts) {
+                if (!part.startsWith("data:")) continue;
+
+                const token = part.replace("data:", "");
+
+                if (token === "[DONE]") {
+                    setAsking(false);
+                    return;
+                }
+
+                setMessages((prev) => {
+                    const updated = [...prev];
+                    updated[assistantIndex] = {
+                        ...updated[assistantIndex],
+                        content: updated[assistantIndex].content + token,
+                    };
+                    return updated;
+                });
+            }
         }
+
+        setAsking(false);
     };
+
 
     const resetChat = () => {
         conversationId.current = uuidv4();

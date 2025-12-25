@@ -12,6 +12,9 @@ from backend.helper import compute_pdf_hash, embed_texts, embed_query
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
+from fastapi.responses import StreamingResponse
+from backend.llm import stream_answer
+
 
 EMBED_DIM = 3072
 MAX_CHARS = 900
@@ -35,9 +38,12 @@ app.include_router(auth_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Type"],
 )
+
 
 # -------------------- HELPERS --------------------
 def extract_pages(pdf_path: Path):
@@ -247,3 +253,52 @@ def ask(req: AskRequest):
 def reset_chat_api(conversation_id: str):
     reset_chat(conversation_id)
     return {"message": "Chat reset"}
+
+@app.post("/ask-stream")
+def ask_stream(req: AskRequest, user=Depends(get_current_user)):
+    pdf_index_dir = INDEX_ROOT / req.pdf_id
+    index_path = pdf_index_dir / "faiss.index"
+    docs_path = pdf_index_dir / "documents.npy"
+
+    if not index_path.exists() or not docs_path.exists():
+        raise HTTPException(404, "PDF index not found")
+
+    # Load FAISS
+    index = faiss.read_index(str(index_path))
+    documents = list(np.load(docs_path, allow_pickle=True))
+
+    # Embed query
+    q_emb = embed_query(req.question)
+    faiss.normalize_L2(q_emb)
+
+    distances, ids = index.search(q_emb, k=min(20, index.ntotal))
+
+    relevant_chunks = []
+    for d, i in zip(distances[0], ids[0]):
+        if i != -1:
+            relevant_chunks.append(documents[i]["text"])
+
+    context = "\n\n".join(relevant_chunks)
+
+    history = get_chat_history(req.conversation_id)
+
+    def event_generator():
+        # Stream tokens
+        for token in stream_answer(
+            context,
+            req.question,
+            history,
+            req.answer_mode
+        ):
+            yield f"data:{token}\n\n"
+
+        # Save chat AFTER completion
+        save_chat_message(req.conversation_id, "user", req.question)
+        save_chat_message(req.conversation_id, "assistant", "[STREAMED]")
+
+        yield "data:[DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream"
+    )
