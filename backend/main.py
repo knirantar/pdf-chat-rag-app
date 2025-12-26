@@ -14,6 +14,7 @@ from fastapi import Depends
 from backend.routes.auth import auth_router
 from fastapi.responses import StreamingResponse
 from backend.llm import stream_answer
+import json
 
 
 EMBED_DIM = 3072
@@ -276,42 +277,58 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     distances, ids = index.search(q_emb, k=min(20, index.ntotal))
 
     relevant_chunks = []
+    sources = set()
+
     for d, i in zip(distances[0], ids[0]):
         if i != -1:
-            relevant_chunks.append(documents[i]["text"])
+            doc = documents[i]
+            relevant_chunks.append(doc["text"])
+            sources.add(f"{doc['source']} (Page {doc.get('page', 'N/A')})")
 
     context = "\n\n".join(relevant_chunks)
-
     history = get_chat_history(req.conversation_id)
 
     def event_generator():
-        buffer = ""
+        full_answer = ""
 
+        # ---- STREAM TEXT ----
         for token in stream_answer(
             context,
             req.question,
             history,
             req.answer_mode
         ):
-            buffer += token
-
-            # Stream only when buffer has enough content
-            if len(buffer) > 80 or token.endswith("\n"):
-                clean = normalize_markdown(buffer)
-                yield f"data:{clean}\n\n"
-                buffer = ""
-
-        # Flush remaining buffer
-        if buffer.strip():
-            clean = normalize_markdown(buffer)
+            full_answer += token
+            clean = normalize_markdown(token)
             yield f"data:{clean}\n\n"
 
-        # Save chat AFTER completion
+        # ---- VERIFY & METADATA ----
+        verification = verify_answer(full_answer, context)
+
+        if verification["supported"]:
+            if verification["strength"] == "strong":
+                confidence = 0.8
+                final_sources = list(sources)
+            else:
+                confidence = 0.4
+                final_sources = []
+        else:
+            confidence = 0.1
+            final_sources = []
+
+        meta_event = {
+            "confidence": round(confidence, 2),
+            "sources": final_sources
+        }
+
+        # 🔥 SEND METADATA AS JSON EVENT
+        yield f"data:{json.dumps(meta_event)}\n\n"
+
+        # ---- SAVE CHAT ----
         save_chat_message(req.conversation_id, "user", req.question)
-        save_chat_message(req.conversation_id, "assistant", "[STREAMED]")
+        save_chat_message(req.conversation_id, "assistant", full_answer)
 
         yield "data:[DONE]\n\n"
-
 
     return StreamingResponse(
         event_generator(),
