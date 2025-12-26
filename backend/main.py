@@ -290,8 +290,9 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
 
     def event_generator():
         full_answer = ""
+        buffer = ""
 
-        # ---- STREAM TEXT ----
+        # ---- STREAM TEXT (BUFFERED) ----
         for token in stream_answer(
             context,
             req.question,
@@ -299,7 +300,17 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
             req.answer_mode
         ):
             full_answer += token
-            clean = normalize_markdown(token)
+            buffer += token
+
+            # flush buffer periodically
+            if len(buffer) > 80 or token.endswith("\n"):
+                clean = normalize_markdown(buffer)
+                yield f"data:{clean}\n\n"
+                buffer = ""
+
+        # flush remaining buffer
+        if buffer:
+            clean = normalize_markdown(buffer)
             yield f"data:{clean}\n\n"
 
         # ---- VERIFY & METADATA ----
@@ -317,11 +328,12 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
             final_sources = []
 
         meta_event = {
+            "type": "meta",
             "confidence": round(confidence, 2),
             "sources": final_sources
         }
 
-        # 🔥 SEND METADATA AS JSON EVENT
+        # 🔥 SEND METADATA (NON-TEXT EVENT)
         yield f"data:{json.dumps(meta_event)}\n\n"
 
         # ---- SAVE CHAT ----
