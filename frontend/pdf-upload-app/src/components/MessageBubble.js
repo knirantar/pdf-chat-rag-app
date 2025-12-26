@@ -14,11 +14,13 @@ export default function MessageBubble({ message, index, expanded, toggleSources 
             {isAssistant ? (
                 <>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{fixMarkdown(message.content)}</ReactMarkdown>
-                    {isAssistant && message.sources && message.sources.length > 0 && (
+
+                    {message.sources && message.sources.length > 0 && (
                         <div className="mt-2">
                             <button onClick={toggleSources} className="text-xs text-blue-400 hover:underline">
                                 {expanded ? "Hide sources ▼" : "Show sources ▲"}
                             </button>
+
                             {expanded && (
                                 <div className="mt-2 space-y-2 text-xs text-white/70 border-l border-white/10 pl-3">
                                     {message.sources.map((src, sIdx) => (
@@ -30,6 +32,7 @@ export default function MessageBubble({ message, index, expanded, toggleSources 
                             )}
                         </div>
                     )}
+
                     {message.confidence !== undefined && (
                         <div className="mt-3 text-xs text-white/60">
                             Confidence: <span className="font-medium">{(message.confidence * 100).toFixed(1)}%</span>

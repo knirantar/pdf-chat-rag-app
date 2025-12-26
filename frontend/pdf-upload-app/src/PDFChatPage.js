@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Upload } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 
 import Sidebar from "./components/Sidebar";
@@ -64,6 +64,10 @@ export default function ChatPdf({ onLogout }) {
         if (!selectedFile) return;
         setUploading(true);
 
+        // create placeholder entry so sidebar shows indexing state immediately
+        const tempId = `pending-${uuidv4()}`;
+        setPdfs((prev) => [...prev, { id: tempId, name: selectedFile.name, indexing: true }]);
+
         try {
             const formData = new FormData();
             formData.append("file", selectedFile);
@@ -76,22 +80,33 @@ export default function ChatPdf({ onLogout }) {
 
             const data = await res.json();
 
-            setPdfs((prev) => {
-                if (prev.some(p => p.id === data.pdf_id)) return prev;
-                return [...prev, { id: data.pdf_id, name: selectedFile.name }];
-            });
+            // update placeholder entry with actual pdf_id and indexing status
+            const indexed = typeof data.message === "string" && (data.message.toLowerCase().includes("indexed successfully") || data.message.toLowerCase().includes("reusing existing index"));
+            setPdfs((prev) =>
+                prev.map((p) =>
+                    p.id === tempId
+                        ? { id: data.pdf_id, name: selectedFile.name, indexing: false, indexed }
+                        : p
+                )
+            );
 
-            setActivePdf({ id: data.pdf_id, name: selectedFile.name });
-            setMessages([]);
+            // if indexed immediately, set active
+            if (indexed) {
+                setActivePdf({ id: data.pdf_id, name: selectedFile.name });
+                setMessages([]);
+            } else {
+                // leave as not-active until indexing completes (server returned message that indicates background indexing)
+                alert("PDF uploaded. Indexing in background — it will appear in Documents when ready.");
+            }
+
             setFile(null);
         } catch {
             alert("Upload failed");
+            setPdfs((prev) => prev.filter((p) => p.id !== tempId));
         } finally {
             setUploading(false);
         }
     };
-
-
 
     const askQuestion = async () => {
         if (!question.trim() || !activePdf) return;
@@ -140,17 +155,44 @@ export default function ChatPdf({ onLogout }) {
                 for (const part of parts) {
                     if (!part.startsWith("data:")) continue;
 
-                    const token = part.replace(/^data:\s?/, "");
-                    if (token === "[DONE]") break;
+                    let token = part.replace(/^data:\s?/, "").trim();
 
-                    setMessages((prev) => {
-                        const updated = [...prev];
-                        updated[assistantIndexRef.current] = {
-                            ...updated[assistantIndexRef.current],
-                            content: updated[assistantIndexRef.current].content + token,
-                        };
-                        return updated;
-                    });
+                    if (token === "[DONE]") {
+                        // stream finished
+                        break;
+                    }
+
+                    // If backend sends JSON metadata events, parse and attach
+                    let parsed = null;
+                    try {
+                        parsed = JSON.parse(token);
+                    } catch (e) {
+                        parsed = null;
+                    }
+
+                    if (parsed && (parsed.sources || parsed.confidence || parsed.text)) {
+                        setMessages((prev) => {
+                            const updated = [...prev];
+                            const cur = updated[assistantIndexRef.current] || { role: "assistant", content: "" };
+                            // If text field present, append it
+                            if (parsed.text) {
+                                cur.content = (cur.content || "") + parsed.text;
+                            }
+                            if (parsed.sources) cur.sources = parsed.sources;
+                            if (parsed.confidence !== undefined) cur.confidence = parsed.confidence;
+                            updated[assistantIndexRef.current] = cur;
+                            return updated;
+                        });
+                    } else {
+                        // treat as normal token text
+                        setMessages((prev) => {
+                            const updated = [...prev];
+                            const cur = updated[assistantIndexRef.current] || { role: "assistant", content: "" };
+                            cur.content = (cur.content || "") + token;
+                            updated[assistantIndexRef.current] = cur;
+                            return updated;
+                        });
+                    }
                 }
             }
         } catch (err) {
@@ -159,8 +201,6 @@ export default function ChatPdf({ onLogout }) {
             setAsking(false);
         }
     };
-
-
 
     const resetChat = () => {
         conversationId.current = uuidv4();
