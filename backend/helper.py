@@ -42,8 +42,11 @@ def normalize_markdown(text: str) -> str:
     # Fix bold spacing
     text = re.sub(r"\*\*\s+(.*?)\s+\*\*", r"**\1**", text)
 
-    # Fix spaced words: "Strateg ic" → "Strategic"
-    text = re.sub(r"(\w)\s+(\w)", r"\1 \2", text)
+    # 🔥 FIX: ensure blank line before numbered lists
+    text = re.sub(r'([^\n])(\d+\.\s)', r'\1\n\n\2', text)
+
+    # 🔥 FIX: ensure blank line before bullet lists
+    text = re.sub(r'([^\n])(-\s)', r'\1\n\n\2', text)
 
     # Headings on new lines
     text = re.sub(r"(#+)([^\n])", r"\1 \2", text)
@@ -51,8 +54,9 @@ def normalize_markdown(text: str) -> str:
     # Ensure blank line before headings
     text = re.sub(r"\n(#+)", r"\n\n\1", text)
 
-    # Normalize newlines
+    # Normalize excessive newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
+
 
