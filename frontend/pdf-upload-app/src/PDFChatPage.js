@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 
 import Sidebar from "./components/Sidebar";
@@ -170,20 +170,29 @@ export default function ChatPdf({ onLogout }) {
                         parsed = null;
                     }
 
-                    if (parsed && (parsed.sources || parsed.confidence || parsed.text)) {
+                    if (parsed && typeof parsed === "object") {
                         setMessages((prev) => {
                             const updated = [...prev];
                             const cur = updated[assistantIndexRef.current] || { role: "assistant", content: "" };
-                            // If text field present, append it
+
                             if (parsed.text) {
                                 cur.content = (cur.content || "") + parsed.text;
                             }
-                            if (parsed.sources) cur.sources = parsed.sources;
-                            if (parsed.confidence !== undefined) cur.confidence = parsed.confidence;
+
+                            if (parsed.sources) {
+                                cur.sources = parsed.sources;
+                            }
+
+                            if (parsed.confidence !== undefined) {
+                                cur.confidence = parsed.confidence;
+                            }
+
                             updated[assistantIndexRef.current] = cur;
                             return updated;
                         });
-                    } else {
+                        continue;
+                    }
+                    else {
                         // treat as normal token text
                         setMessages((prev) => {
                             const updated = [...prev];
