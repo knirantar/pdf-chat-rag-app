@@ -41,6 +41,7 @@ Rules:
 - Use ONLY the document context provided below.
 - If the answer is not explicitly and clearly present, say:
   "The document does not contain this information."
+- Structure the answer using headings and bullet points where appropriate.
 - Do NOT use general knowledge.
 - Do NOT infer, guess, or extrapolate.
 - Do NOT mention sources, pages, PDFs, confidence, or metadata.
@@ -52,6 +53,7 @@ Rules:
 - Prefer the document context when it is relevant.
 - If the document does not fully answer the question:
   - You MAY use general knowledge to explain the concept.
+- Structure the answer using headings and bullet points where appropriate.
 - If document context is used, relate your explanation to it.
 - Clearly explain concepts in simple language.
 - Do NOT fabricate document-specific facts.
@@ -138,3 +140,18 @@ Return ONLY valid JSON:
         return json.loads(response.choices[0].message.content)
     except Exception:
         return {"supported": False, "strength": "none"}
+
+def stream_answer(context: str, question: str, history: list, answer_mode: str):
+    prompt = build_prompt(context, question, history, answer_mode)
+
+    stream = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        stream=True
+    )
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        if delta and delta.content:
+            yield delta.content

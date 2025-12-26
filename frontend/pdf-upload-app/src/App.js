@@ -4,6 +4,7 @@ import ChatPdf from "./PDFChatPage";
 
 function App() {
 
+  const API_URL = process.env.REACT_APP_API_URL;
   const [token, setToken] = useState(
     localStorage.getItem("app_token")
   );
@@ -13,7 +14,7 @@ function App() {
     try {
       // 1. Send Google ID token to backend
       const res = await fetch(
-        `/api/auth/google`,
+        `${API_URL}/auth/google`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

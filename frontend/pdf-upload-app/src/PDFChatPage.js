@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Upload, Send, Plus, FileText, Loader2 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 
 
 
@@ -23,7 +26,7 @@ export default function ChatPdf({ onLogout }) {
     const [asking, setAsking] = useState(false);
     const [answerMode, setAnswerMode] = useState("strict");
     const [expandedSources, setExpandedSources] = useState({});
-    const API_URL = process.env.REACT_APP_API_URL || "http://backend:8000";
+    const API_URL = process.env.REACT_APP_API_URL;
     const chatKey = user ? `chatSession_${user.email}` : null;
 
     // Load saved session on mount
@@ -64,7 +67,7 @@ export default function ChatPdf({ onLogout }) {
             const formData = new FormData();
             formData.append("file", file);
 
-            const res = await fetch(`/api/upload-pdf`, {
+            const res = await fetch(`${API_URL}/upload-pdf`, {
                 method: "POST",
                 headers: {
                     ...getAuthHeaders()
@@ -88,15 +91,19 @@ export default function ChatPdf({ onLogout }) {
 
         const userMsg = { role: "user", content: question };
         setMessages((m) => [...m, userMsg]);
+
+        const assistantIndex = messages.length + 1;
+        setMessages((m) => [...m, { role: "assistant", content: "" }]);
+
         setQuestion("");
         setAsking(true);
 
         try {
-            const res = await fetch(`/api/ask`, {
+            const res = await fetch(`${API_URL}/ask-stream`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    ...getAuthHeaders()
+                    Authorization: `Bearer ${localStorage.getItem("app_token")}`,
                 },
                 body: JSON.stringify({
                     question,
@@ -106,23 +113,55 @@ export default function ChatPdf({ onLogout }) {
                 }),
             });
 
-            const data = await res.json();
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
 
-            setMessages((m) => [
-                ...m,
-                {
-                    role: "assistant",
-                    content: data.messages?.[0]?.content || "No response",
-                    confidence: data.confidence ?? null,
-                    sources: Array.isArray(data.sources) ? data.sources : [],
-                },
-            ]);
-        } catch {
-            alert("Error getting answer");
-        } finally {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                const parts = buffer.split("\n");
+                buffer = parts.pop(); // keep incomplete part
+
+                for (const part of parts) {
+                    if (!part.startsWith("data:")) continue;
+
+                    let token = part.replace(/^data:\s?/, "");
+                    if (token === "[DONE]") {
+                        setAsking(false);
+                        return;
+                    }
+
+                    // Fix run-on words: add a space if previous char is not whitespace
+                    setMessages((prev) => {
+                        const updated = [...prev];
+                        const prevContent = updated[assistantIndex].content;
+                        updated[assistantIndex] = {
+                            ...updated[assistantIndex],
+                            content: prevContent + token,
+                        };
+                        return updated;
+                    });
+                }
+            }
+
+            setAsking(false);
+        } catch (err) {
+            console.error("Error streaming answer:", err);
             setAsking(false);
         }
     };
+
+    const fixMarkdown = (text) => {
+        return text
+            .replace(/([^\n])(#{1,6}\s)/g, "$1\n\n$2")
+            .replace(/([^\n])(-\s)/g, "$1\n\n$2");
+    };
+
+
 
     const resetChat = () => {
         conversationId.current = uuidv4();
@@ -263,7 +302,46 @@ export default function ChatPdf({ onLogout }) {
                                     className={`max-w-[80%] px-4 py-3 rounded-lg ${m.role === "user" ? "bg-blue-600 text-white" : "bg-zinc-800 text-white"
                                         }`}
                                 >
-                                    <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>
+                                    {m.role === "assistant" ? (
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                code({ inline, children }) {
+                                                    return inline ? (
+                                                        <code className="bg-white/10 px-1 rounded text-xs">
+                                                            {children}
+                                                        </code>
+                                                    ) : (
+                                                        <pre className="bg-black/40 p-3 rounded-lg overflow-x-auto text-xs mt-2">
+                                                            <code>{children}</code>
+                                                        </pre>
+                                                    );
+                                                },
+                                                ul({ children }) {
+                                                    return <ul className="list-disc ml-5 mt-2">{children}</ul>;
+                                                },
+                                                ol({ children }) {
+                                                    return <ol className="list-decimal ml-5 mt-2">{children}</ol>;
+                                                },
+                                                h1({ children }) {
+                                                    return <h1 className="text-lg font-semibold mt-3">{children}</h1>;
+                                                },
+                                                h2({ children }) {
+                                                    return <h2 className="text-base font-semibold mt-3">{children}</h2>;
+                                                },
+                                                p({ children }) {
+                                                    return <p className="mt-2 leading-relaxed">{children}</p>;
+                                                },
+                                            }}
+                                        >
+                                            {fixMarkdown(m.content)}
+                                        </ReactMarkdown>
+                                    ) : (
+                                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                            {m.content}
+                                        </div>
+                                    )}
+
 
                                     {m.role === "assistant" && m.confidence !== undefined && (
                                         <div className="mt-3 text-xs text-white/60">

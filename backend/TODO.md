@@ -1,10 +1,10 @@
 Streaming GPT tokens with citations UI
 2️⃣ Chat memory per conversation - DONE
 3️⃣ Cost optimization + caching - Done
-5️⃣ Enterprise security hardening
+5️⃣ Enterprise security hardening - Done added google Oauth2
 
 
-3️⃣ Improve chunking (semantic / page-based)
+3️⃣ Improve chunking (semantic / page-based) - Done
 3️⃣ Stream answers (SSE)
 4️⃣ Multi-PDF metadata filtering
 5️⃣ Docker Compose deployment
