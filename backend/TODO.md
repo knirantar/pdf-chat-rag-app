@@ -5,12 +5,12 @@ Streaming GPT tokens with citations UI
 
 
 3️⃣ Improve chunking (semantic / page-based) - Done
-3️⃣ Stream answers (SSE)
+3️⃣ Stream answers (SSE) - Done
+5️⃣ Docker Compose deployment - Done
 4️⃣ Multi-PDF metadata filtering
-5️⃣ Docker Compose deployment
+
 
 Azure OpenAI migration (India-safe, cheaper)
-2️⃣ Streaming GPT answers with citations UI
 3️⃣ Multi-PDF selector + per-PDF filtering
 4️⃣ JWT authentication (real users)
 5️⃣ Docker + Azure deployment
