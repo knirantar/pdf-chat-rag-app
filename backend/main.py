@@ -267,7 +267,7 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     if not index_path.exists() or not docs_path.exists():
         raise HTTPException(404, "PDF index not found")
 
-    # -------- Load index + documents --------
+    # -------- Load FAISS index + documents --------
     index = faiss.read_index(str(index_path))
     documents = list(np.load(docs_path, allow_pickle=True))
 
@@ -277,9 +277,9 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
 
     distances, ids = index.search(q_emb, k=min(20, index.ntotal))
 
+    # Collect relevant chunks
     relevant_chunks = []
     sources = set()
-
     for i in ids[0]:
         if i == -1:
             continue
@@ -293,32 +293,24 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     # -------- SSE Generator --------
     def event_generator():
         full_answer = ""
-        buffer = []
-        buffer_len = 0
-        FLUSH_CHARS = 40
 
-        for token in stream_answer(
-            context,
-            req.question,
-            history,
-            req.answer_mode
-        ):
-            # IMPORTANT: never modify token
-            buffer.append(token)
-            buffer_len += len(token)
+        # Collect all tokens first
+        for token in stream_answer(context, req.question, history, req.answer_mode):
             full_answer += token
 
-            if buffer_len >= FLUSH_CHARS:
-                yield f"data:{''.join(buffer)}\n\n"
-                buffer.clear()
-                buffer_len = 0
+            # Optional: stream in safe chunks (sentence-level) if needed
+            if re.search(r"[.!?]\s$", full_answer):
+                # send partial buffer if you want live effect
+                yield f"data:{full_answer}\n\n"
+                full_answer = ""
 
         # Flush remaining
-        if buffer:
-            yield f"data:{''.join(buffer)}\n\n"
+        if full_answer.strip():
+            yield f"data:{full_answer}\n\n"
 
-        # -------- Verification --------
-        verification = verify_answer(full_answer, context)
+        # -------- Verification & Metadata --------
+        final_answer = normalize_markdown("".join([full_answer]))
+        verification = verify_answer(final_answer, context)
 
         confidence = 0.1
         final_sources = []
@@ -328,16 +320,14 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
             if verification["strength"] == "strong":
                 final_sources = list(sources)
 
-        # -------- Metadata Event --------
-        yield f"data:{json.dumps({'confidence': round(confidence, 2), 'sources': final_sources})}\n\n"
+        # Send final metadata
+        yield f"data:{json.dumps({'confidence': round(confidence, 2), 'sources': final_sources, 'text': final_answer})}\n\n"
         yield "data:[DONE]\n\n"
 
         # -------- Persist Chat --------
         save_chat_message(req.conversation_id, "user", req.question)
-        save_chat_message(req.conversation_id, "assistant", full_answer)
+        save_chat_message(req.conversation_id, "assistant", final_answer)
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 
