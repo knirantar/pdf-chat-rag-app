@@ -54,12 +54,21 @@ def normalize_markdown(text: str) -> str:
 
     return text.strip()
 
-def safe_append(buffer: str, token: str) -> str:
-    if not buffer:
-        return token
-    if buffer[-1].isalnum() and token and token[0].isalnum():
-        return buffer + " " + token
-    return buffer + token
+def fix_tokenization(text: str) -> str:
+    """
+    Re-join broken subword tokens caused by streaming
+    """
+    # Join common English splits
+    text = re.sub(r"(\b[A-Za-z]{2,})\s+([a-z]{2,}\b)", r"\1\2", text)
+
+    # Fix hyphenated breaks
+    text = re.sub(r"-\s+", "-", text)
+
+    # Fix multiple spaces
+    text = re.sub(r"\s{2,}", " ", text)
+
+    return text
+
 
 
 

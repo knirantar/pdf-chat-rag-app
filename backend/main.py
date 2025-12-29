@@ -9,7 +9,7 @@ import re
 from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
-from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize_markdown,safe_append
+from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize_markdown,fix_tokenization
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
@@ -280,36 +280,29 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     relevant_chunks = []
     sources = set()
 
-    for d, i in zip(distances[0], ids[0]):
-        if i != -1:
-            doc = documents[i]
-            relevant_chunks.append(doc["text"])
-            sources.add(f"{doc['source']} (Page {doc.get('page', 'N/A')})")
+    for i in ids[0]:
+        if i == -1:
+            continue
+        doc = documents[i]
+        relevant_chunks.append(doc["text"])
+        sources.add(f"{doc['source']} (Page {doc.get('page', 'N/A')})")
 
     context = "\n\n".join(relevant_chunks)
     history = get_chat_history(req.conversation_id)
 
     def event_generator():
-        buffer = ""
         full_answer = ""
 
+        # --- STREAM RAW TOKENS ---
         for token in stream_answer(context, req.question, history, req.answer_mode):
-            buffer = safe_append(buffer, token)
             full_answer += token
+            yield f"data:{token}\n\n"
 
-            if re.search(r"[.!?]\s$", buffer) or buffer.endswith("\n\n"):
-                clean = normalize_markdown(buffer)
-                yield f"data:{clean}\n\n"
-                buffer = ""
+        # --- POST PROCESS ONCE ---
+        clean_text = fix_tokenization(full_answer)
+        clean_text = normalize_markdown(clean_text)
 
-
-        # Flush remaining buffer
-        if buffer.strip():
-            clean = normalize_markdown(buffer)
-            yield f"data:{clean}\n\n"
-
-        # ---- METADATA ----
-        verification = verify_answer(full_answer, context)
+        verification = verify_answer(clean_text, context)
 
         confidence = 0.1
         final_sources = []
@@ -319,9 +312,9 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
             if verification["strength"] == "strong":
                 final_sources = list(sources)
 
+        # --- SEND METADATA ---
         yield f"data:{json.dumps({'confidence': confidence, 'sources': final_sources})}\n\n"
         yield "data:[DONE]\n\n"
-
 
     return StreamingResponse(
         event_generator(),
