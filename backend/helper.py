@@ -39,22 +39,17 @@ def embed_query(text: str) -> np.ndarray:
     return np.array([response.data[0].embedding], dtype="float32")
 
 def normalize_markdown(text: str) -> str:
-    # Fix bold spacing
-    text = re.sub(r"\*\*\s+(.*?)\s+\*\*", r"**\1**", text)
-
-    # 🔥 FIX: ensure blank line before numbered lists
-    text = re.sub(r'([^\n])(\d+\.\s)', r'\1\n\n\2', text)
-
-    # 🔥 FIX: ensure blank line before bullet lists
-    text = re.sub(r'([^\n])(-\s)', r'\1\n\n\2', text)
-
-    # Headings on new lines
+    # Fix headings
     text = re.sub(r"(#+)([^\n])", r"\1 \2", text)
-
-    # Ensure blank line before headings
     text = re.sub(r"\n(#+)", r"\n\n\1", text)
 
-    # Normalize excessive newlines
+    # Fix numbered lists
+    text = re.sub(r'([^\n])(\d+\.\s)', r'\1\n\n\2', text)
+
+    # Fix bullet lists
+    text = re.sub(r'([^\n])(-\s)', r'\1\n\n\2', text)
+
+    # Normalize newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()

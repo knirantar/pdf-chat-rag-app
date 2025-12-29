@@ -289,58 +289,49 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     history = get_chat_history(req.conversation_id)
 
     def event_generator():
-        full_answer = ""
         buffer = ""
+        full_answer = ""
 
-        # ---- STREAM TEXT (BUFFERED) ----
         for token in stream_answer(
             context,
             req.question,
             history,
             req.answer_mode
         ):
-            full_answer += token
             buffer += token
+            full_answer += token
 
-            # flush buffer periodically
-            if len(buffer) > 80 or token.endswith("\n"):
+            # 🔥 SAFE FLUSH CONDITIONS
+            if (
+                buffer.endswith(". ")
+                or buffer.endswith("\n\n")
+                or "\n1." in buffer
+                or "\n- " in buffer
+                or len(buffer) > 200
+            ):
                 clean = normalize_markdown(buffer)
                 yield f"data:{clean}\n\n"
                 buffer = ""
 
-        # flush remaining buffer
-        if buffer:
+        # Flush remaining buffer
+        if buffer.strip():
             clean = normalize_markdown(buffer)
             yield f"data:{clean}\n\n"
 
-        # ---- VERIFY & METADATA ----
+        # ---- METADATA ----
         verification = verify_answer(full_answer, context)
 
+        confidence = 0.1
+        final_sources = []
+
         if verification["supported"]:
+            confidence = 0.8 if verification["strength"] == "strong" else 0.4
             if verification["strength"] == "strong":
-                confidence = 0.8
                 final_sources = list(sources)
-            else:
-                confidence = 0.4
-                final_sources = []
-        else:
-            confidence = 0.1
-            final_sources = []
 
-        meta_event = {
-            "type": "meta",
-            "confidence": round(confidence, 2),
-            "sources": final_sources
-        }
-
-        # 🔥 SEND METADATA (NON-TEXT EVENT)
-        yield f"data:{json.dumps(meta_event)}\n\n"
-
-        # ---- SAVE CHAT ----
-        save_chat_message(req.conversation_id, "user", req.question)
-        save_chat_message(req.conversation_id, "assistant", full_answer)
-
+        yield f"data:{json.dumps({'confidence': confidence, 'sources': final_sources})}\n\n"
         yield "data:[DONE]\n\n"
+
 
     return StreamingResponse(
         event_generator(),
