@@ -267,11 +267,11 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     if not index_path.exists() or not docs_path.exists():
         raise HTTPException(404, "PDF index not found")
 
-    # Load FAISS
+    # -------- Load index + documents --------
     index = faiss.read_index(str(index_path))
     documents = list(np.load(docs_path, allow_pickle=True))
 
-    # Embed query
+    # -------- Embed query --------
     q_emb = embed_query(req.question)
     faiss.normalize_L2(q_emb)
 
@@ -290,19 +290,35 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
     context = "\n\n".join(relevant_chunks)
     history = get_chat_history(req.conversation_id)
 
+    # -------- SSE Generator --------
     def event_generator():
         full_answer = ""
+        buffer = []
+        buffer_len = 0
+        FLUSH_CHARS = 40
 
-        # --- STREAM RAW TOKENS ---
-        for token in stream_answer(context, req.question, history, req.answer_mode):
+        for token in stream_answer(
+            context,
+            req.question,
+            history,
+            req.answer_mode
+        ):
+            # IMPORTANT: never modify token
+            buffer.append(token)
+            buffer_len += len(token)
             full_answer += token
-            yield f"data:{token}\n\n"
 
-        # --- POST PROCESS ONCE ---
-        clean_text = fix_tokenization(full_answer)
-        clean_text = normalize_markdown(clean_text)
+            if buffer_len >= FLUSH_CHARS:
+                yield f"data:{''.join(buffer)}\n\n"
+                buffer.clear()
+                buffer_len = 0
 
-        verification = verify_answer(clean_text, context)
+        # Flush remaining
+        if buffer:
+            yield f"data:{''.join(buffer)}\n\n"
+
+        # -------- Verification --------
+        verification = verify_answer(full_answer, context)
 
         confidence = 0.1
         final_sources = []
@@ -312,11 +328,16 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
             if verification["strength"] == "strong":
                 final_sources = list(sources)
 
-        # --- SEND METADATA ---
-        yield f"data:{json.dumps({'confidence': confidence, 'sources': final_sources})}\n\n"
+        # -------- Metadata Event --------
+        yield f"data:{json.dumps({'confidence': round(confidence, 2), 'sources': final_sources})}\n\n"
         yield "data:[DONE]\n\n"
+
+        # -------- Persist Chat --------
+        save_chat_message(req.conversation_id, "user", req.question)
+        save_chat_message(req.conversation_id, "assistant", full_answer)
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream"
     )
+
