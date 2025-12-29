@@ -155,7 +155,7 @@ export default function ChatPdf({ onLogout }) {
                 for (const part of parts) {
                     if (!part.startsWith("data:")) continue;
 
-                    let token = part.replace(/^data:\s?/, "").trim();
+                    let token = part.replace(/^data:\s?/, "");
 
                     if (token === "[DONE]") {
                         // stream finished
