@@ -5,10 +5,11 @@ from pathlib import Path
 import fitz
 import numpy as np
 import faiss
+import re
 from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
-from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize_markdown
+from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize_markdown,safe_append
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
@@ -292,26 +293,15 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
         buffer = ""
         full_answer = ""
 
-        for token in stream_answer(
-            context,
-            req.question,
-            history,
-            req.answer_mode
-        ):
-            buffer += token
+        for token in stream_answer(context, req.question, history, req.answer_mode):
+            buffer = safe_append(buffer, token)
             full_answer += token
 
-            # 🔥 SAFE FLUSH CONDITIONS
-            if (
-                buffer.endswith(". ")
-                or buffer.endswith("\n\n")
-                or "\n1." in buffer
-                or "\n- " in buffer
-                or len(buffer) > 200
-            ):
+            if re.search(r"[.!?]\s$", buffer) or buffer.endswith("\n\n"):
                 clean = normalize_markdown(buffer)
                 yield f"data:{clean}\n\n"
                 buffer = ""
+
 
         # Flush remaining buffer
         if buffer.strip():

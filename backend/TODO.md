@@ -1,35 +1,110 @@
 Streaming GPT tokens with citations UI
-2️⃣ Chat memory per conversation - DONE
-3️⃣ Cost optimization + caching - Done
-5️⃣ Enterprise security hardening - Done added google Oauth2
+Chat memory per conversation - DONE
+Cost optimization + caching - Done
+Enterprise security hardening - Done added google Oauth2
+Improve chunking (semantic / page-based) - Done
+Stream answers (SSE) - Done
+Docker Compose deployment - Done
+Multi-PDF selector + per-PDF filtering
+Docker + Azure deployment - cant be done requires money
+Per-user authentication memory - maybe in future
+Multi-PDF isolated chats - maybe in future
+Full Agent architecture - need to check how we can 
 
+🥇 LAYER 1 — WOW FEATURES (people instantly notice)
+1️⃣ Citation-aware inline highlights (HUGE WOW)
+What users see
+Click a citation → PDF opens → highlighted text scrolls into view
+Like Perplexity + ChatGPT combined
+How
+Store page + char_start + char_end during chunking
+Return citations as structured objects
+Frontend:
+Render citations clickable
+Use PDF.js text layer to highlight ranges
+📈 Impact: Instant credibility + academic trust
+💡 This alone makes people choose your app.
 
-3️⃣ Improve chunking (semantic / page-based) - Done
-3️⃣ Stream answers (SSE) - Done
-5️⃣ Docker Compose deployment - Done
-4️⃣ Multi-PDF metadata filtering
+2️⃣ “Ask this PDF” smart suggestions
+Auto-generate:
+“What is the main argument?”
+“Summarize chapter 3”
+“What evidence supports X?”
+“What does the author conclude?”
+How
+On upload → run a summary agent
+Store suggested questions per PDF
+📈 Impact: Reduces blank-screen anxiety
 
+3️⃣ Confidence-aware answer labeling
+You already compute confidence — surface it properly
+Example UI:
+🟢 Strongly supported by document
+🟡 Partially supported
+🔴 General knowledge
+Do NOT show raw numbers
+Humans understand labels better than percentages.
 
-Azure OpenAI migration (India-safe, cheaper)
-3️⃣ Multi-PDF selector + per-PDF filtering
-4️⃣ JWT authentication (real users)
-5️⃣ Docker + Azure deployment
+4️⃣ “Explain like I’m 5 / Expert / Exam-ready”
+One answer → multiple modes
+Backend
+answer_style: "simple" | "detailed" | "exam"
+📈 Students + professionals LOVE this.
 
-Streaming GPT answers
-2️⃣ Source citation per sentence
-3️⃣ Multi-PDF filtering
-4️⃣ Chat memory
-5️⃣ Azure OpenAI migration
+5️⃣ Multi-PDF reasoning (killer feature)
+Ask:
+“Compare Ashoka’s dhamma with Arthashastra”
+Implementation
+Allow selecting multiple PDFs
+Run retrieval per PDF
+Merge context with PDF IDs
+Ask LLM to compare sources explicitly
+📈 This is where your app beats ChatGPT.
 
-🔹 Memory summarization in Redis
+6️⃣ Auto-fact verification agent (trust bomb)
+After answer:
+Run verifier
+Highlight unsupported sentences in ⚠️ yellow
+Add note: “This sentence is inferred”
+📈 Academic & legal users will trust you.
 
-🔹 Per-user authentication memory
+8️⃣ Question decomposition agent
+For complex questions:
+“Why did Ashoka change his policy after Kalinga?”
+Agent:
+Identify sub-questions
+Retrieve per sub-question
+Synthesize final answer
+📈 Answers feel human-expert-level
 
-🔹 Multi-PDF isolated chats
+9️⃣ Timeline & map views (history killer feature)
+For historical PDFs:
+Auto-extract dates
+Render timeline
+Optional map pins (e.g., Mauryan empire)
+📈 No one else does this well.
 
-🔹 Redis Streams for analytics
+🔟 Reading-mode chat (UX gold)
+Split screen:
+Left: PDF
+Right: chat
+Auto-scroll PDF when answer references a page
+Feels like Notion + ChatGPT + Kindle.
 
-🔹 Full Agent architecture
+1️⃣1️⃣ Export everything
+Export chat → Markdown / PDF
+Export citations
+“Create study notes”
+📈 Students & researchers = ❤️
 
+🚀 NEXT-LEVEL (optional but insane)
+🔮 Full Agent Architecture (your last TODO)
+Yes — and you’re ready for it
 
-python -m nltk.downloader punkt
+Suggested agents:
+📄 Retriever Agent
+🧠 Reasoning Agent
+🔍 Verification Agent
+✂️ Compression Agent
+📚 Citation Agent
+Use simple orchestration first (no LangGraph yet).

@@ -54,4 +54,12 @@ def normalize_markdown(text: str) -> str:
 
     return text.strip()
 
+def safe_append(buffer: str, token: str) -> str:
+    if not buffer:
+        return token
+    if buffer[-1].isalnum() and token and token[0].isalnum():
+        return buffer + " " + token
+    return buffer + token
+
+
 
