@@ -14,6 +14,7 @@ from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
+from backend.routes.pdfs import pdf_router
 from fastapi.responses import StreamingResponse
 from backend.llm import stream_answer
 import json
@@ -39,6 +40,7 @@ INDEX_ROOT.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="PDF RAG Chat Backend")
 
 app.include_router(auth_router)
+app.include_router(pdf_router)
 
 app.add_middleware(
     CORSMiddleware,

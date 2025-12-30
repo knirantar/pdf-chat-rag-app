@@ -3,9 +3,9 @@ from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from fastapi import APIRouter, HTTPException
 
-auth_router = APIRouter(prefix="/pdfs", tags=["pdfs"])
+pdf_router = APIRouter(prefix="/pdfs", tags=["pdfs"])
 
-@auth_router.post("/pdfs")
+@pdf_router.post("/pdfs")
 async def list_pdfs(user=Depends(get_current_user)):
     cursor = pdfs_col.find({"owner": user["sub"]})
     pdfs = []
