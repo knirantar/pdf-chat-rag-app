@@ -65,7 +65,7 @@ export default function ChatPdf({ onLogout }) {
         console.log("Fetching PDFs");
         console.log(API_URL);
 
-        fetch(`${API_URL}/pdfs`, {
+        fetch(`${API_URL}/pdfs/`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
