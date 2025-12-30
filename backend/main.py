@@ -9,7 +9,7 @@ import pickle
 from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
-from backend.helper import compute_pdf_hash, embed_texts,embed_query, normalize_markdown
+from backend.helper import compute_pdf_hash, embed_texts,embed_query, normalize_markdown, clean_context, dedupe_chunks
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
