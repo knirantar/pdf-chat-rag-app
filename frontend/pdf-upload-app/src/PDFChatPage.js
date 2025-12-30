@@ -68,12 +68,14 @@ export default function ChatPdf({ onLogout }) {
                     data.map((p) => ({
                         id: p.id,
                         name: p.name,
-                        indexing: !p.indexed, // 🔥 THIS IS THE FIX
+                        indexed: p.indexed,          // ✅ STORE IT
+                        indexing: p.indexing ?? false // optional if backend sends it
                     }))
                 )
             )
             .catch(console.error);
     }, [API_URL, token]);
+
 
 
     /* -------------------- UPLOAD -------------------- */

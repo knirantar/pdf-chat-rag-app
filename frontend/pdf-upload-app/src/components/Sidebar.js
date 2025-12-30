@@ -52,7 +52,7 @@ export default function Sidebar({
                 <div className="space-y-2">
                     {files.map((pdf) => {
                         const isActive = activePdf?.id === pdf.id;
-                        const isDisabled = pdf.indexing === true || pdf.indexed === false;
+                        const isDisabled = !pdf.indexed;
 
                         return (
                             <button
@@ -72,15 +72,14 @@ export default function Sidebar({
                                 <div className="flex-1">
                                     <div className="break-words text-sm">{pdf.name}</div>
 
-                                    {pdf.indexing ? (
+                                    {!pdf.indexed ? (
                                         <div className="text-xs text-white/60 mt-1 flex items-center gap-2">
                                             <Loader2 className="animate-spin" size={14} /> Indexing...
                                         </div>
-                                    ) : pdf.indexed ? (
-                                        <div className="text-xs text-white/60 mt-1">Ready</div>
                                     ) : (
-                                        <div className="text-xs text-amber-300 mt-1">Uploaded (awaiting index)</div>
+                                        <div className="text-xs text-white/60 mt-1">Ready</div>
                                     )}
+
                                 </div>
                             </button>
                         );
