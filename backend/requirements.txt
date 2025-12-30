@@ -14,3 +14,4 @@ openai
 python-jose
 google-auth
 requests
+motor

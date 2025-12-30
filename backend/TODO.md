@@ -108,3 +108,15 @@ Suggested agents:
 ✂️ Compression Agent
 📚 Citation Agent
 Use simple orchestration first (no LangGraph yet).
+
+Bugs
+
+Refresh 
+
+Log in and logout does not persists book at left hand side even though its their in the context for the backend 
+
+After certain period api throws 401 authorize if same chat next question asked after certain time and refresh doesn't fix it and doesn't ask for login and keeps on giving same 401 till we login again and then comes the 1st bug mentioned
+
+If its uploaded for the account in the past it should always show up in the documents and once clicked on it should the context be selected
+
+Profile picture not loading properly from google oauth login - Fixed

@@ -60,6 +60,20 @@ export default function ChatPdf({ onLogout }) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    useEffect(() => {
+        if (!token) return;
+
+        fetch(`${API_URL}/pdfs`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        })
+            .then((res) => res.json())
+            .then((data) => setPdfs(data))
+            .catch(console.error);
+    }, [API_URL, token]);
+
+
     const uploadPdf = async (selectedFile = file) => {
         if (!selectedFile) return;
         setUploading(true);

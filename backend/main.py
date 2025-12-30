@@ -1,3 +1,4 @@
+from pydoc import doc
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -16,6 +17,8 @@ from backend.routes.auth import auth_router
 from fastapi.responses import StreamingResponse
 from backend.llm import stream_answer
 import json
+from backend.db.mongo import pdfs_col
+from datetime import datetime, timezone
 
 
 EMBED_DIM = 3072
@@ -140,6 +143,18 @@ async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user
     else:
         print("PDF already exists, reusing existing file")
 
+    await pdfs_col.update_one(
+        {"_id": pdf_id},
+        {
+            "$set": {
+                "name": file.filename,
+                "owner": user["sub"],
+                "uploaded_at": datetime.now(timezone.utc)
+            }
+        },
+        upsert=True
+    )
+
     # Create index directory
     pdf_index_dir = INDEX_ROOT / pdf_id
     if pdf_index_dir.exists():
@@ -260,6 +275,15 @@ def reset_chat_api(conversation_id: str):
 
 @app.post("/ask-stream")
 def ask_stream(req: AskRequest, user=Depends(get_current_user)):
+
+    doc = pdfs_col.find_one({
+        "_id": req.pdf_id,
+        "owner": user["sub"]
+    })
+
+    if not doc:
+        raise HTTPException(403, "Access denied")
+
     pdf_index_dir = INDEX_ROOT / req.pdf_id
     index_path = pdf_index_dir / "faiss.index"
     docs_path = pdf_index_dir / "documents.npy"
