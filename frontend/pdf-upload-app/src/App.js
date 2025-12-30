@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import ChatPdf from "./PDFChatPage";
+import LandingPage from "./LandingPage";
+
 
 function App() {
 
@@ -47,20 +49,9 @@ function App() {
 
 
   if (!token) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-zinc-900 text-white">
-        <div className="text-center space-y-6">
-          <h1 className="text-2xl font-semibold">PDF Chat App</h1>
-          <p className="text-white/60">Login with Google to continue</p>
-
-          <GoogleLogin
-            onSuccess={onLoginSuccess}
-            onError={() => alert("Login Failed")}
-          />
-        </div>
-      </div>
-    );
+    return <LandingPage onLoginSuccess={onLoginSuccess} />;
   }
+
 
   return <ChatPdf onLogout={logout} />;
 }
