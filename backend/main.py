@@ -20,7 +20,6 @@ from backend.llm import stream_answer
 import json
 from backend.db.mongo import pdfs_col
 from datetime import datetime, timezone
-from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 
 
@@ -52,7 +51,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Type"],
 )
-app.add_middleware(HTTPSRedirectMiddleware)
 
 
 # -------------------- HELPERS --------------------
