@@ -20,6 +20,8 @@ from backend.llm import stream_answer
 import json
 from backend.db.mongo import pdfs_col
 from datetime import datetime, timezone
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+
 
 
 EMBED_DIM = 3072
@@ -44,6 +46,7 @@ app.include_router(pdf_router)
 
 app.add_middleware(
     CORSMiddleware,
+    HTTPSRedirectMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
