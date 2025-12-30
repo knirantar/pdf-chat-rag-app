@@ -69,6 +69,32 @@ def fix_tokenization(text: str) -> str:
 
     return text
 
+def is_fact_question(q: str) -> bool:
+    q = q.lower().strip()
+    return (
+        q.startswith("who ")
+        or q.startswith("is there")
+        or q.startswith("how many")
+        or q.startswith("which author")
+        or q.startswith("name ")
+    )
 
+def dedupe_chunks(chunks: list[str]) -> list[str]:
+    seen = set()
+    deduped = []
+    for c in chunks:
+        key = c.strip().lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(c)
+    return deduped
 
+def clean_context(text: str) -> str:
+    sentences = sent_tokenize(text)
+    clean = []
+    for s in sentences:
+        s = s.strip()
+        if len(s) > 20 and not s.lower().startswith("page"):
+            clean.append(s)
+    return "\n".join(clean)
 

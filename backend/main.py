@@ -10,7 +10,7 @@ import re
 from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
-from backend.helper import compute_pdf_hash, embed_texts, embed_query, normalize_markdown,fix_tokenization
+from backend.helper import compute_pdf_hash, embed_texts,embed_query, normalize_markdown,dedupe_chunks,clean_context, is_fact_question,fix_tokenization
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
@@ -304,17 +304,26 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
 
     distances, ids = index.search(q_emb, k=min(20, index.ntotal))
 
+    is_fact = is_fact_question(req.question)
+
+    k = 2 if is_fact else min(8, index.ntotal)
+    SIM_THRESHOLD = 0.45 if is_fact else 0.25
+
     # Collect relevant chunks
     relevant_chunks = []
     sources = set()
-    for i in ids[0]:
+    for dist, i in zip(distances[0], ids[0]):
         if i == -1:
+            continue
+        sim = 1 - dist / 2
+        if sim < SIM_THRESHOLD:
             continue
         doc = documents[i]
         relevant_chunks.append(doc["text"])
         sources.add(f"{doc['source']} (Page {doc.get('page', 'N/A')})")
 
-    context = "\n\n".join(relevant_chunks)
+    relevant_chunks = dedupe_chunks(relevant_chunks)
+    context = clean_context("\n\n".join(relevant_chunks))
     history = get_chat_history(req.conversation_id)
 
     # -------- SSE Generator --------
@@ -348,7 +357,7 @@ def ask_stream(req: AskRequest, user=Depends(get_current_user)):
                 final_sources = list(sources)
 
         # Send final metadata
-        yield f"data:{json.dumps({'confidence': round(confidence, 2), 'sources': final_sources, 'text': final_answer})}\n\n"
+        yield f"data:{json.dumps({'confidence': round(confidence, 2), 'sources': final_sources, 'text': fix_tokenization(final_answer)})}\n\n"
         yield "data:[DONE]\n\n"
 
         # -------- Persist Chat --------
