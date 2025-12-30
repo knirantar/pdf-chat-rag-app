@@ -15,7 +15,8 @@ def google_login(payload: dict):
     jwt_token = create_jwt({
         "sub": google_user["sub"],
         "email": google_user["email"],
-        "name": google_user.get("name")
+        "name": google_user.get("name"),
+        "picture": google_user.get("picture") 
     })
 
     return {

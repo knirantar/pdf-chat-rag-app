@@ -13,7 +13,6 @@ export default function ChatPdf({ onLogout }) {
     });
     const token = localStorage.getItem("app_token");
     const user = token ? jwtDecode(token) : null;
-    console.log("Decoded user:", user);
 
     const conversationId = useRef(uuidv4());
     const messagesEndRef = useRef(null);
