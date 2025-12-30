@@ -62,6 +62,8 @@ export default function ChatPdf({ onLogout }) {
 
     useEffect(() => {
         if (!token) return;
+        console.log("Fetching PDFs");
+        console.log(API_URL);
 
         fetch(`${API_URL}/pdfs`, {
             headers: {
