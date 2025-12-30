@@ -142,7 +142,7 @@ export default function ChatPdf({ onLogout }) {
         setAsking(true);
 
         try {
-            const res = await fetch(`${API_URL}/ask-stream`, {
+            const res = await fetch(`${API_URL}/ask`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
