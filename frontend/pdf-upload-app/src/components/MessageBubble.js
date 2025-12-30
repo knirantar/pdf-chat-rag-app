@@ -10,7 +10,7 @@ const fixMarkdown = (text) => {
 export default function MessageBubble({ message, index, expanded, toggleSources }) {
     const isAssistant = message.role === "assistant";
     return (
-        <div className={`max-w-[80%] px-4 py-3 rounded-lg ${message.role === "user" ? "bg-blue-600 text-white" : "bg-zinc-800 text-white"}`}>
+        <div className={`max-w-[90%] md:max-w-[80%] px-4 py-3 rounded-lg ${message.role === "user" ? "bg-blue-600 text-white" : "bg-zinc-800 text-white"}`}>
             {isAssistant ? (
                 <>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{fixMarkdown(message.content)}</ReactMarkdown>

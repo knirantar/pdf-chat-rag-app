@@ -1,18 +1,35 @@
 import { Plus, FileText, Loader2 } from "lucide-react";
 
 export default function Sidebar({
-    files = [],
+    files,
     activePdf,
     setActivePdf,
-    uploadPdf,
     uploading,
     resetChat,
     user,
     answerMode,
     setAnswerMode,
+    isOpen,
+    onClose,
 }) {
+
+
     return (
-        <aside className="w-64 bg-zinc-800 border-r border-white/10 flex flex-col">
+
+        <aside className={`
+    fixed md:static z-40
+    top-0 left-0 h-full
+    w-64 bg-zinc-800 border-r border-white/10
+    transform transition-transform duration-300
+    ${isOpen ? "translate-x-0" : "-translate-x-full"}
+    md:translate-x-0
+  `}><button
+                onClick={onClose}
+                className="md:hidden text-white/60 text-sm mb-2"
+            >
+                ✕ Close
+            </button>
+
             <div className="p-4 border-b border-white/10 space-y-2">
                 <button
                     onClick={resetChat}

@@ -26,6 +26,8 @@ export default function ChatPdf({ onLogout }) {
 
     const API_URL = process.env.REACT_APP_API_URL;
     const chatKey = user ? `chatSession_${user.email}` : null;
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
 
     /* -------------------- SESSION RESTORE -------------------- */
     useEffect(() => {
@@ -189,7 +191,7 @@ export default function ChatPdf({ onLogout }) {
 
     /* -------------------- UI -------------------- */
     return (
-        <div className="flex h-screen bg-zinc-900 text-white">
+        <div className="flex h-screen bg-zinc-900 text-white overflow-hidden">
             <Sidebar
                 files={pdfs}
                 activePdf={activePdf}
@@ -198,13 +200,23 @@ export default function ChatPdf({ onLogout }) {
                     setActivePdf(pdf);
                     conversationId.current = uuidv4();
                     setMessages([]);
+                    setSidebarOpen(false); // ✅ auto close on mobile
                 }}
                 answerMode={answerMode}
                 setAnswerMode={setAnswerMode}
                 uploading={uploading}
                 resetChat={resetChat}
                 user={user}
+                isOpen={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
             />
+
+            <button
+                className="md:hidden px-3 py-2 bg-white/10 rounded"
+                onClick={() => setSidebarOpen(true)}
+            >
+                ☰
+            </button>
 
             <main className="flex-1 flex flex-col">
                 <header className="p-4 border-b border-white/10 flex items-center gap-4">
@@ -222,7 +234,7 @@ export default function ChatPdf({ onLogout }) {
                         {user && (
                             <>
                                 <img src={user.picture} alt="profile" className="w-8 h-8 rounded-full" />
-                                <div className="text-xs text-right">
+                                <div className="hidden md:block text-xs text-right">
                                     <div>{user.name}</div>
                                     <div className="text-white/50">{user.email}</div>
                                 </div>
@@ -234,7 +246,7 @@ export default function ChatPdf({ onLogout }) {
                     </div>
                 </header>
 
-                <section className="flex-1 overflow-y-auto p-6">
+                <section className="flex-1 overflow-y-auto p-3 md:p-6">
                     <MessageList
                         messages={messages}
                         expandedSources={expandedSources}
@@ -243,7 +255,13 @@ export default function ChatPdf({ onLogout }) {
                     <div ref={messagesEndRef} />
                 </section>
 
-                <footer className="p-4 border-t border-white/10">
+                <footer className="
+                            p-3 md:p-4
+                            border-t border-white/10
+                            sticky bottom-0
+                            bg-zinc-900
+                            z-30
+                        ">
                     <InputBar
                         question={question}
                         setQuestion={setQuestion}
@@ -251,6 +269,7 @@ export default function ChatPdf({ onLogout }) {
                         askQuestion={askQuestion}
                     />
                 </footer>
+
             </main>
         </div>
     );
