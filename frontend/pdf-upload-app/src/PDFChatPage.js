@@ -63,9 +63,18 @@ export default function ChatPdf({ onLogout }) {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => res.json())
-            .then(setPdfs)
+            .then((data) =>
+                setPdfs(
+                    data.map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        indexing: !p.indexed, // 🔥 THIS IS THE FIX
+                    }))
+                )
+            )
             .catch(console.error);
     }, [API_URL, token]);
+
 
     /* -------------------- UPLOAD -------------------- */
     const uploadPdf = async (selectedFile) => {
@@ -86,7 +95,7 @@ export default function ChatPdf({ onLogout }) {
             });
 
             const data = await res.json();
-            const indexed = res.ok;   // ✅ HTTP 200 → READY
+            const indexed = data.message?.toLowerCase().includes("indexed");
 
             setPdfs((prev) =>
                 prev.map((p) =>
@@ -95,6 +104,7 @@ export default function ChatPdf({ onLogout }) {
                         : p
                 )
             );
+
 
             if (indexed) {
                 setActivePdf({ id: data.pdf_id, name: selectedFile.name });
@@ -171,6 +181,7 @@ export default function ChatPdf({ onLogout }) {
                 files={pdfs}
                 activePdf={activePdf}
                 setActivePdf={(pdf) => {
+                    if (pdf.indexing) return;
                     setActivePdf(pdf);
                     conversationId.current = uuidv4();
                     setMessages([]);
