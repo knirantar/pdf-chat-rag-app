@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 pdf_router = APIRouter(prefix="/pdfs", tags=["pdfs"])
 
-@pdf_router.post("/pdfs")
+@pdf_router.get("/")
 async def list_pdfs(user=Depends(get_current_user)):
     cursor = pdfs_col.find({"owner": user["sub"]})
     pdfs = []
