@@ -1,4 +1,3 @@
-from pydoc import doc
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,18 +5,16 @@ from pathlib import Path
 import fitz
 import numpy as np
 import faiss
-import re
+import pickle
 from backend.chat_memory import get_chat_history, save_chat_message,reset_chat
 from nltk.tokenize import sent_tokenize
 from backend.llm import answer_question, verify_answer  # ✅ IMPORTANT
-from backend.helper import compute_pdf_hash, embed_texts,embed_query, normalize_markdown,dedupe_chunks,clean_context, is_fact_question,fix_tokenization
+from backend.helper import compute_pdf_hash, embed_texts,embed_query, normalize_markdown
 from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
 from backend.routes.pdfs import pdf_router
-from fastapi.responses import StreamingResponse
 from backend.llm import stream_answer
-import json
 from backend.db.mongo import pdfs_col
 from datetime import datetime, timezone
 
@@ -29,7 +26,7 @@ OVERLAP_CHARS = 150
 
 # -------------------- CONFIG --------------------
 UPLOAD_DIR = Path("uploads")
-INDEX_ROOT = Path("indexes")
+INDEX_ROOT = Path("/data/indexes")
 max_chars = int(MAX_CHARS)
 overlap_chars = int(OVERLAP_CHARS)
 INDEX_ROOT.mkdir(exist_ok=True)
@@ -136,234 +133,122 @@ async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user
     file_bytes = await file.read()
     pdf_id = compute_pdf_hash(file_bytes)
 
-
-    # Save PDF
     pdf_path = UPLOAD_DIR / f"{pdf_id}.pdf"
-    
     if not pdf_path.exists():
-        with open(pdf_path, "wb") as f:
-            f.write(file_bytes)
-    else:
-        print("PDF already exists, reusing existing file")
+        pdf_path.write_bytes(file_bytes)
 
+    # Mongo metadata
     await pdfs_col.update_one(
         {"_id": pdf_id},
         {
             "$set": {
                 "name": file.filename,
                 "owner": user["sub"],
-                "uploaded_at": datetime.now(timezone.utc)
+                "uploaded_at": datetime.now(timezone.utc),
+                "indexed": False
             }
         },
         upsert=True
     )
 
-    # Create index directory
     pdf_index_dir = INDEX_ROOT / pdf_id
-    if pdf_index_dir.exists():
-        print("PDF already indexed, reusing existing index")
+    index_path = pdf_index_dir / "index.faiss"
+    docs_path = pdf_index_dir / "documents.pkl"
+
+    # If index exists → reuse
+    if index_path.exists() and docs_path.exists():
         return {
             "pdf_id": pdf_id,
             "message": "PDF already indexed, reusing existing index"
         }
-    pdf_index_dir.mkdir(parents=True)
 
-    # Create NEW index + documents
-    index = faiss.IndexFlatL2(int(EMBED_DIM))
-    documents = []
+    pdf_index_dir.mkdir(parents=True, exist_ok=True)
 
-    # Chunk & embed
+    # ---- Chunk & embed ----
     chunks = semantic_chunk_pdf(pdf_path, file.filename)
+    texts = [c["text"] for c in chunks if len(c["text"].strip()) > 10]
 
-    filtered_chunks = [
-        c for c in chunks
-        if isinstance(c["text"], str) and len(c["text"].strip()) > 10
-    ]
-
-    texts = [c["text"] for c in filtered_chunks]
     embeddings = embed_texts(texts)
     faiss.normalize_L2(embeddings)
+
+    index = faiss.IndexFlatL2(EMBED_DIM)
     index.add(embeddings)
-    documents.extend(filtered_chunks)
 
+    # ---- Persist ----
+    faiss.write_index(index, str(index_path))
+    with open(docs_path, "wb") as f:
+        pickle.dump(chunks, f)
 
-    # Persist
-    faiss.write_index(index, str(pdf_index_dir / "faiss.index"))
-    np.save(pdf_index_dir / "documents.npy", documents)
+    # Mark indexed
+    await pdfs_col.update_one(
+        {"_id": pdf_id},
+        {"$set": {"indexed": True}}
+    )
 
     return {
         "pdf_id": pdf_id,
         "message": "PDF indexed successfully",
-        "chunks": len(chunks),
-        "msg": f"PDF uploaded by {user['email']}"
+        "chunks": len(chunks)
     }
 
 @app.post("/ask")
-def ask(req: AskRequest):
-    answer_mode = req.answer_mode  # "strict" or "hybrid"
+def ask(req: AskRequest, user=Depends(get_current_user)):
+    doc = pdfs_col.find_one({
+        "_id": req.pdf_id,
+        "owner": user["sub"],
+        "indexed": True
+    })
+
+    if not doc:
+        raise HTTPException(403, "Access denied or PDF not indexed")
+
     pdf_index_dir = INDEX_ROOT / req.pdf_id
-    index_path = pdf_index_dir / "faiss.index"
-    docs_path = pdf_index_dir / "documents.npy"
+    index_path = pdf_index_dir / "index.faiss"
+    docs_path = pdf_index_dir / "documents.pkl"
 
-    if not index_path.exists() or not docs_path.exists():
-        raise HTTPException(404, "PDF index not found")
+    if not index_path.exists():
+        raise HTTPException(404, "Index not found")
 
-    # Load FAISS index and documents
     index = faiss.read_index(str(index_path))
-    documents = list(np.load(docs_path, allow_pickle=True))
+    with open(docs_path, "rb") as f:
+        documents = pickle.load(f)
 
-    if index.ntotal == 0:
-        raise HTTPException(400, "No vectors in index")
-
-    # Embed and normalize the query
     q_emb = embed_query(req.question)
     faiss.normalize_L2(q_emb)
 
-    # Search in FAISS index (L2 distance on normalized vectors)
-    k = min(20, index.ntotal)  # retrieve up to 20 candidates
-    distances, ids = index.search(q_emb, k=k)
-
-    # Convert to cosine similarity (for normalized vectors)
-    similarities = 1 - distances / 2  # cosine similarity approximation
+    k = min(15, index.ntotal)
+    distances, ids = index.search(q_emb, k)
 
     relevant_chunks = []
     sources = set()
-    SIM_THRESHOLD = 0.25  # Accept even loose matches for context
 
-    for sim, i in zip(similarities[0], ids[0]):
-        if i == -1 or sim < SIM_THRESHOLD:
+    for dist, i in zip(distances[0], ids[0]):
+        if i == -1:
             continue
+        sim = 1 - dist / 2
+        if sim < 0.25:
+            continue
+        d = documents[i]
+        relevant_chunks.append(d["text"])
+        sources.add(f"{d['source']} (Page {d['page']})")
 
-        doc = documents[i]
-        relevant_chunks.append(doc["text"])
-        sources.add(f"{doc['source']} (Page {doc.get('page', 'N/A')})")
-
-    # Merge chunks into context
-    context = "\n\n".join(relevant_chunks)
-
-    # Debug: Check context length
-    print("---- CONTEXT LENGTH ----", len(context))
-    print("---- CONTEXT PREVIEW ----", context[:500])
-
-    # Load chat history
+    context = clean_context("\n\n".join(dedupe_chunks(relevant_chunks)))
     history = get_chat_history(req.conversation_id)
 
-    # Generate answer with context
-    result = answer_question(context, req.question, history, answer_mode)
-
-    # Verify answer to reduce hallucination
+    result = answer_question(context, req.question, history, req.answer_mode)
     verification = verify_answer(result["text"], context)
-    
-    # Save chat messages
+
     save_chat_message(req.conversation_id, "user", req.question)
     save_chat_message(req.conversation_id, "assistant", result["text"])
 
-    result['text'] = normalize_markdown(result['text'])
-
     return {
-        "messages": [{"role": "assistant", "content": result["text"]}],
-        "answer_type": result.get("answer_type", "DOCUMENT"),
-        "confidence": round(result.get("confidence", 0.8), 2),
-        "sources": (
-            list(sources)
-            if verification["supported"] and verification["strength"] == "strong"
-            else []
-        ),
+        "messages": [{"role": "assistant", "content": normalize_markdown(result["text"])}],
+        "confidence": 0.8 if verification["supported"] else 0.3,
+        "sources": list(sources) if verification["supported"] else []
     }
+
 
 @app.post("/reset-chat/{conversation_id}")
 def reset_chat_api(conversation_id: str):
     reset_chat(conversation_id)
     return {"message": "Chat reset"}
-
-@app.post("/ask-stream")
-def ask_stream(req: AskRequest, user=Depends(get_current_user)):
-
-    doc = pdfs_col.find_one({
-        "_id": req.pdf_id,
-        "owner": user["sub"]
-    })
-
-    if not doc:
-        raise HTTPException(403, "Access denied")
-
-    pdf_index_dir = INDEX_ROOT / req.pdf_id
-    index_path = pdf_index_dir / "faiss.index"
-    docs_path = pdf_index_dir / "documents.npy"
-
-    if not index_path.exists() or not docs_path.exists():
-        raise HTTPException(404, "PDF index not found")
-
-    # -------- Load FAISS index + documents --------
-    index = faiss.read_index(str(index_path))
-    documents = list(np.load(docs_path, allow_pickle=True))
-
-    # -------- Embed query --------
-    q_emb = embed_query(req.question)
-    faiss.normalize_L2(q_emb)
-
-    distances, ids = index.search(q_emb, k=min(20, index.ntotal))
-
-    is_fact = is_fact_question(req.question)
-
-    k = 2 if is_fact else min(8, index.ntotal)
-    SIM_THRESHOLD = 0.45 if is_fact else 0.25
-
-    # Collect relevant chunks
-    relevant_chunks = []
-    sources = set()
-    for dist, i in zip(distances[0], ids[0]):
-        if i == -1:
-            continue
-        sim = 1 - dist / 2
-        if sim < SIM_THRESHOLD:
-            continue
-        doc = documents[i]
-        relevant_chunks.append(doc["text"])
-        sources.add(f"{doc['source']} (Page {doc.get('page', 'N/A')})")
-
-    relevant_chunks = dedupe_chunks(relevant_chunks)
-    context = clean_context("\n\n".join(relevant_chunks))
-    history = get_chat_history(req.conversation_id)
-
-    # -------- SSE Generator --------
-    def event_generator():
-        full_answer = ""
-
-        # Collect all tokens first
-        for token in stream_answer(context, req.question, history, req.answer_mode):
-            full_answer += token
-
-            # Optional: stream in safe chunks (sentence-level) if needed
-            if re.search(r"[.!?]\s$", full_answer):
-                # send partial buffer if you want live effect
-                yield f"data:{full_answer}\n\n"
-                full_answer = ""
-
-        # Flush remaining
-        if full_answer.strip():
-            yield f"data:{full_answer}\n\n"
-
-        # -------- Verification & Metadata --------
-        final_answer = normalize_markdown("".join([full_answer]))
-        verification = verify_answer(final_answer, context)
-
-        confidence = 0.1
-        final_sources = []
-
-        if verification["supported"]:
-            confidence = 0.8 if verification["strength"] == "strong" else 0.4
-            if verification["strength"] == "strong":
-                final_sources = list(sources)
-
-        # Send final metadata
-        yield f"data:{json.dumps({'confidence': round(confidence, 2), 'sources': final_sources, 'text': fix_tokenization(final_answer)})}\n\n"
-        yield "data:[DONE]\n\n"
-
-        # -------- Persist Chat --------
-        save_chat_message(req.conversation_id, "user", req.question)
-        save_chat_message(req.conversation_id, "assistant", final_answer)
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
