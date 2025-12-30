@@ -25,8 +25,8 @@ export default function Sidebar({
                     <button
                         onClick={() => setAnswerMode("strict")}
                         className={`flex-1 px-2 py-1 rounded text-xs border ${answerMode === "strict"
-                                ? "bg-blue-600 border-blue-500 text-white"
-                                : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+                            ? "bg-blue-600 border-blue-500 text-white"
+                            : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
                             }`}
                     >
                         📄 Document
@@ -35,8 +35,8 @@ export default function Sidebar({
                     <button
                         onClick={() => setAnswerMode("hybrid")}
                         className={`flex-1 px-2 py-1 rounded text-xs border ${answerMode === "hybrid"
-                                ? "bg-purple-600 border-purple-500 text-white"
-                                : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
+                            ? "bg-purple-600 border-purple-500 text-white"
+                            : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10"
                             }`}
                     >
                         🧠 Hybrid
@@ -52,7 +52,7 @@ export default function Sidebar({
                 <div className="space-y-2">
                     {files.map((pdf) => {
                         const isActive = activePdf?.id === pdf.id;
-                        const isDisabled = pdf.indexing || !pdf.indexed;
+                        const isDisabled = pdf.indexing === true || pdf.indexed === false;
 
                         return (
                             <button
