@@ -16,7 +16,8 @@ export default function Sidebar({
 
     return (
 
-        <aside className={`
+        <aside onClick={(e) => e.stopPropagation()}
+            className={`
     fixed md:static z-40
     top-0 left-0 h-full
     w-64 bg-zinc-800 border-r border-white/10
