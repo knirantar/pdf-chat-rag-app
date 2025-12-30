@@ -13,7 +13,8 @@ async def list_pdfs(user=Depends(get_current_user)):
     async for doc in cursor:
         pdfs.append({
             "id": doc["_id"],
-            "name": doc["name"]
+            "name": doc["name"],
+            "indexed": doc.get("indexed", False) 
         })
 
     return pdfs
