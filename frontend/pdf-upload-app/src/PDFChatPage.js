@@ -86,7 +86,7 @@ export default function ChatPdf({ onLogout }) {
             });
 
             const data = await res.json();
-            const indexed = data.message?.toLowerCase().includes("indexed");
+            const indexed = res.ok;   // ✅ HTTP 200 → READY
 
             setPdfs((prev) =>
                 prev.map((p) =>
