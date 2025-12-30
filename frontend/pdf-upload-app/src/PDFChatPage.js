@@ -100,14 +100,25 @@ export default function ChatPdf({ onLogout }) {
             setPdfs((prev) =>
                 prev.map((p) =>
                     p.id === tempId
-                        ? { id: data.pdf_id, name: selectedFile.name, indexing: false }
+                        ? {
+                            id: data.pdf_id,
+                            name: selectedFile.name,
+                            indexing: false,
+                            indexed: true, // ✅ ADD THIS
+                        }
                         : p
                 )
             );
 
 
+
             if (indexed) {
-                setActivePdf({ id: data.pdf_id, name: selectedFile.name });
+                setActivePdf({
+                    id: data.pdf_id,
+                    name: selectedFile.name,
+                    indexed: true,
+                });
+
                 setMessages([]);
             }
         } catch {
