@@ -8,3 +8,5 @@ db = client["pdf_chat"]
 
 users_col = db["users"]
 pdfs_col = db["pdfs"]
+pdf_summaries_col = db["pdf_summaries"]
+

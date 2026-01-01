@@ -7,7 +7,7 @@ pdf_router = APIRouter(prefix="/pdfs", tags=["pdfs"])
 
 @pdf_router.get("/")
 async def list_pdfs(user=Depends(get_current_user)):
-    cursor = pdfs_col.find({"owner": user["sub"]})
+    cursor = pdfs_col.find({"user_id": user["sub"]})
     pdfs = []
 
     async for doc in cursor:

@@ -78,6 +78,16 @@ textarea {
   outline: none;
 }
 
+
+/* Dark themed buttons matching app */
+.bg-card {
+  background-color: var(--card);
+}
+
+.bg-card:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Buttons */
 button {
   border-radius: var(--radius);

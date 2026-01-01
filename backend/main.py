@@ -14,10 +14,11 @@ from backend.auth.dependencies import get_current_user
 from fastapi import Depends
 from backend.routes.auth import auth_router
 from backend.routes.pdfs import pdf_router
+from backend.routes.summaries import router as summaries_router
 from backend.llm import stream_answer
 from backend.db.mongo import pdfs_col
 from datetime import datetime, timezone
-
+from uuid import uuid4
 
 
 EMBED_DIM = 3072
@@ -29,7 +30,6 @@ UPLOAD_DIR = Path("uploads")
 INDEX_ROOT = Path("/data/indexes")
 max_chars = int(MAX_CHARS)
 overlap_chars = int(OVERLAP_CHARS)
-INDEX_ROOT.mkdir(exist_ok=True)
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 INDEX_ROOT.mkdir(parents=True, exist_ok=True)
@@ -39,6 +39,8 @@ app = FastAPI(title="PDF RAG Chat Backend")
 
 app.include_router(auth_router)
 app.include_router(pdf_router)
+app.include_router(summaries_router)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -125,46 +127,52 @@ class AskRequest(BaseModel):
     answer_mode: str  # "strict" or "hybrid"
 
 # -------------------- ROUTES --------------------
+
+
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user)):
     if file.content_type != "application/pdf":
         raise HTTPException(400, "Only PDF allowed")
 
     file_bytes = await file.read()
-    pdf_id = compute_pdf_hash(file_bytes)
+    content_hash = compute_pdf_hash(file_bytes)
+    user_id = user["sub"]
 
-    pdf_path = UPLOAD_DIR / f"{pdf_id}.pdf"
+    # 🔐 Check if THIS USER already uploaded this PDF
+    existing = await pdfs_col.find_one({
+        "user_id": user_id,
+        "content_hash": content_hash
+    })
+
+    if existing:
+        return {
+            "pdf_id": existing["_id"],
+            "message": "PDF already uploaded"
+        }
+
+    pdf_id = str(uuid4())
+
+    # Store raw PDF (content-based is OK here)
+    pdf_path = UPLOAD_DIR / f"{content_hash}.pdf"
     if not pdf_path.exists():
         pdf_path.write_bytes(file_bytes)
 
-    # Mongo metadata
-    await pdfs_col.update_one(
-        {"_id": pdf_id},
-        {
-            "$set": {
-                "name": file.filename,
-                "owner": user["sub"],
-                "uploaded_at": datetime.now(timezone.utc),
-                "indexed": False
-            }
-        },
-        upsert=True
-    )
+    await pdfs_col.insert_one({
+        "_id": pdf_id,
+        "user_id": user_id,
+        "content_hash": content_hash,
+        "name": file.filename,
+        "indexed": False,
+        "uploaded_at": datetime.now(timezone.utc)
+    })
 
-    pdf_index_dir = INDEX_ROOT / pdf_id
+    # 🔐 USER-SCOPED INDEX PATH
+    pdf_index_dir = INDEX_ROOT / user_id / pdf_id
+    pdf_index_dir.mkdir(parents=True, exist_ok=True)
+
     index_path = pdf_index_dir / "index.faiss"
     docs_path = pdf_index_dir / "documents.pkl"
 
-    # If index exists → reuse
-    if index_path.exists() and docs_path.exists():
-        return {
-            "pdf_id": pdf_id,
-            "message": "PDF already indexed, reusing existing index"
-        }
-
-    pdf_index_dir.mkdir(parents=True, exist_ok=True)
-
-    # ---- Chunk & embed ----
     chunks = semantic_chunk_pdf(pdf_path, file.filename)
     texts = [c["text"] for c in chunks if len(c["text"].strip()) > 10]
 
@@ -174,12 +182,10 @@ async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user
     index = faiss.IndexFlatL2(EMBED_DIM)
     index.add(embeddings)
 
-    # ---- Persist ----
     faiss.write_index(index, str(index_path))
     with open(docs_path, "wb") as f:
         pickle.dump(chunks, f)
 
-    # Mark indexed
     await pdfs_col.update_one(
         {"_id": pdf_id},
         {"$set": {"indexed": True}}
@@ -187,27 +193,30 @@ async def upload_pdf(file: UploadFile = File(...), user=Depends(get_current_user
 
     return {
         "pdf_id": pdf_id,
-        "message": "PDF indexed successfully",
+        "message": "PDF uploaded & indexed",
         "chunks": len(chunks)
     }
 
+
 @app.post("/ask")
 def ask(req: AskRequest, user=Depends(get_current_user)):
+    user_id = user["sub"]
+
     doc = pdfs_col.find_one({
         "_id": req.pdf_id,
-        "owner": user["sub"],
+        "user_id": user_id,
         "indexed": True
     })
 
     if not doc:
-        raise HTTPException(403, "Access denied or PDF not indexed")
+        raise HTTPException(403, "Access denied")
 
-    pdf_index_dir = INDEX_ROOT / req.pdf_id
+    pdf_index_dir = INDEX_ROOT / user_id / req.pdf_id
     index_path = pdf_index_dir / "index.faiss"
     docs_path = pdf_index_dir / "documents.pkl"
 
     if not index_path.exists():
-        raise HTTPException(404, "Index not found")
+        raise HTTPException(404, "Index missing")
 
     index = faiss.read_index(str(index_path))
     with open(docs_path, "rb") as f:
@@ -246,6 +255,7 @@ def ask(req: AskRequest, user=Depends(get_current_user)):
         "confidence": 0.8 if verification["supported"] else 0.3,
         "sources": list(sources) if verification["supported"] else []
     }
+
 
 
 @app.post("/reset-chat/{conversation_id}")
