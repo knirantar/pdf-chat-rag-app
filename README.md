@@ -67,6 +67,7 @@ pdf-chat-rag-app/
 ├── .env.example
 └── README.md
 
+```
 
 ## 📌 Features
 
@@ -98,6 +99,7 @@ Ensure you have the following installed:
 ```bash
 git clone https://github.com/knirantar/pdf-chat-rag-app.git
 cd pdf-chat-rag-app
+
 
 cp .env.example .env
 
